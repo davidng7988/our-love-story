@@ -21,6 +21,11 @@
   <!-- Floating background particles -->
   <canvas id="heartCanvas" class="heart-canvas"></canvas>
 
+  <!-- Background Audio Element -->
+  <audio id="bgMusic" loop preload="auto">
+    <source src="assets/love-story.mp3" type="audio/mpeg">
+  </audio>
+
   <!-- Top App Bar -->
   <header class="app-header">
     <div class="header-content">
@@ -29,7 +34,7 @@
         <span class="logo-text">Our Story</span>
       </div>
       <div class="header-actions">
-        <button id="musicToggleBtn" class="icon-btn" title="Romantic Melody" aria-label="Toggle Music">
+        <button id="musicToggleBtn" class="icon-btn" title="Taylor Swift - Love Story" aria-label="Toggle Music">
           <span class="music-note">🎵</span>
         </button>
         <button id="heartBurstBtn" class="icon-btn love-btn" title="Send Love" aria-label="Send Love">
@@ -47,6 +52,26 @@
     
     <!-- Hero / Love Counter Section -->
     <section class="hero-section">
+      <!-- Music Player Bar: Taylor Swift - Love Story -->
+      <div class="music-banner" id="musicBanner">
+        <div class="disc-container" id="discContainer">
+          <div class="vinyl-disc" id="vinylDisc">
+            <span class="disc-emoji">💿</span>
+          </div>
+        </div>
+        <div class="song-meta" id="songMeta">
+          <div class="song-title-row">
+            <span class="song-title">Love Story</span>
+            <span class="song-badge">Taylor Swift</span>
+          </div>
+          <div class="song-lyrics" id="songLyrics">“Romeo, take me somewhere we can be alone...” 💕</div>
+        </div>
+        <button class="play-pill-btn" id="musicPillPlayBtn" aria-label="Play or Pause Taylor Swift Love Story">
+          <span class="play-icon" id="playIcon">▶</span>
+          <span class="play-text" id="playText">Play</span>
+        </button>
+      </div>
+
       <div class="floating-badge">
         <span class="pulse-dot"></span>
         <span>Every second with you is a gift ✨</span>
@@ -208,6 +233,7 @@
       <div class="sheet-tabs">
         <button class="sheet-tab-btn active" data-tab="memoriesTab">📸 Memories & Photos</button>
         <button class="sheet-tab-btn" data-tab="settingsTab">💑 Couple Settings</button>
+        <button class="sheet-tab-btn" data-tab="musicTab">🎵 Music & Song</button>
         <button class="sheet-tab-btn" data-tab="backupTab">💾 Export / Backup</button>
       </div>
 
@@ -257,7 +283,51 @@
           </form>
         </div>
 
-        <!-- TAB 3: Backup & GitHub Sync -->
+        <!-- TAB 3: Music Settings -->
+        <div class="sheet-tab-content" id="musicTab">
+          <div class="backup-box">
+            <h4>🎵 Background Music: Taylor Swift - Love Story</h4>
+            <p>“Romeo, take me somewhere we can be alone, I'll be waiting, all there's left to do is run...”</p>
+            
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Current Mode</label>
+              <div class="music-mode-status" id="musicModeStatus">
+                <span>✨ Built-in Love Story Chorus (Music Box Synth)</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Upload MP3 Audio File (Taylor Swift - Love Story)</label>
+              <p class="form-hint">Upload an MP3 from your phone or laptop to play the studio audio directly on this device.</p>
+              <input type="file" id="audioFileInput" accept="audio/*" style="display: none;">
+              <button type="button" class="btn secondary-btn full-btn" id="triggerAudioUploadBtn">
+                <span>📁</span> Select MP3 File from Device
+              </button>
+              <button type="button" class="btn danger-btn small-btn hidden" id="removeCustomAudioBtn" style="margin-top: 8px;">
+                Reset to Built-in Music Box Melody
+              </button>
+            </div>
+
+            <hr class="form-divider">
+
+            <div class="form-group">
+              <label>Or enter custom Audio Link (MP3 URL)</label>
+              <input type="url" id="customAudioUrlInput" class="form-control" placeholder="https://example.com/love-story.mp3">
+              <button type="button" class="btn outline-btn small-btn" id="saveAudioUrlBtn" style="margin-top: 8px;">
+                Save Audio URL
+              </button>
+            </div>
+
+            <hr class="form-divider">
+
+            <div class="form-group">
+              <label>Music Volume</label>
+              <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.05" value="0.7" style="width: 100%;">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: Backup & GitHub Sync -->
         <div class="sheet-tab-content" id="backupTab">
           <div class="backup-box">
             <h4>💾 Export & Sync</h4>

@@ -6,8 +6,10 @@ let currentSettings = { ...DEFAULT_SETTINGS };
 let currentMemories = [...DEFAULT_MEMORIES];
 let currentFilter = 'all';
 let audioContext = null;
-let isPlayingMelody = false;
-let melodyInterval = null;
+let isPlayingMusic = false;
+let synthTimeoutId = null;
+let customAudioBlobUrl = null;
+let musicVolume = 0.7;
 
 // DOM Elements
 const dom = {
@@ -33,8 +35,15 @@ const dom = {
   filterBtns: document.querySelectorAll('.filter-btn'),
   openAddMemoryBtn: document.getElementById('openAddMemoryBtn'),
 
-  // Header & Floating
+  // Header & Music Elements
+  bgMusic: document.getElementById('bgMusic'),
   musicToggleBtn: document.getElementById('musicToggleBtn'),
+  musicBanner: document.getElementById('musicBanner'),
+  musicPillPlayBtn: document.getElementById('musicPillPlayBtn'),
+  vinylDisc: document.getElementById('vinylDisc'),
+  songLyrics: document.getElementById('songLyrics'),
+  playIcon: document.getElementById('playIcon'),
+  playText: document.getElementById('playText'),
   heartBurstBtn: document.getElementById('heartBurstBtn'),
   openAdminBtn: document.getElementById('openAdminBtn'),
   adminFooterBtn: document.getElementById('adminFooterBtn'),
@@ -47,6 +56,15 @@ const dom = {
   adminAddNewBtn: document.getElementById('adminAddNewBtn'),
   sheetTabBtns: document.querySelectorAll('.sheet-tab-btn'),
   sheetTabContents: document.querySelectorAll('.sheet-tab-content'),
+
+  // Music Admin Controls
+  musicModeStatus: document.getElementById('musicModeStatus'),
+  audioFileInput: document.getElementById('audioFileInput'),
+  triggerAudioUploadBtn: document.getElementById('triggerAudioUploadBtn'),
+  removeCustomAudioBtn: document.getElementById('removeCustomAudioBtn'),
+  customAudioUrlInput: document.getElementById('customAudioUrlInput'),
+  saveAudioUrlBtn: document.getElementById('saveAudioUrlBtn'),
+  musicVolumeSlider: document.getElementById('musicVolumeSlider'),
 
   // Settings Form
   settingsForm: document.getElementById('settingsForm'),
@@ -801,8 +819,28 @@ function setupEventListeners() {
     }
   });
 
-  // Music Player Toggle
-  dom.musicToggleBtn.addEventListener('click', toggleMelody);
+  // Music Player Toggles
+  dom.musicToggleBtn.addEventListener('click', toggleMusic);
+  dom.musicPillPlayBtn.addEventListener('click', toggleMusic);
+
+  // Audio Upload & Settings
+  dom.triggerAudioUploadBtn.addEventListener('click', () => dom.audioFileInput.click());
+  dom.audioFileInput.addEventListener('change', handleCustomAudioUpload);
+  dom.removeCustomAudioBtn.addEventListener('click', resetCustomAudio);
+
+  dom.saveAudioUrlBtn.addEventListener('click', () => {
+    const url = dom.customAudioUrlInput.value.trim();
+    if (url) {
+      setAudioSource(url);
+      db.saveSetting('customAudioUrl', url);
+      showToast('Custom audio URL saved! 🎵');
+    }
+  });
+
+  dom.musicVolumeSlider.addEventListener('input', (e) => {
+    musicVolume = parseFloat(e.target.value);
+    if (dom.bgMusic) dom.bgMusic.volume = musicVolume;
+  });
 }
 
 // =====================================================
@@ -910,77 +948,271 @@ function createHeartBurst(x, y) {
 }
 
 // =====================================================
-// SOFT ROMANTIC WEB AUDIO LULLABY
+// TAYLOR SWIFT - LOVE STORY MUSIC & SYNTHESIZER ENGINE
+// "Romeo, take me somewhere we can be alone..."
 // =====================================================
-function toggleMelody() {
-  if (isPlayingMelody) {
-    stopMelody();
+
+// Note frequencies (Key of D)
+const N = {
+  D3: 146.83, E3: 164.81, FS3: 185.00, G3: 196.00, A3: 220.00, B3: 246.94,
+  D4: 293.66, E4: 329.63, FS4: 369.99, G4: 392.00, A4: 440.00, B4: 493.88,
+  CS5: 554.37, D5: 587.33, E5: 659.25, FS5: 739.99
+};
+
+// Chorus melody notes & lyrics
+const LOVE_STORY_CHORUS = [
+  // "Ro-me-o, take me some-where we can be a-lone"
+  { note: N.FS4, dur: 280, bass: N.D3, lyric: "“Romeo, take me somewhere we can be alone...” 💕" },
+  { note: N.A4,  dur: 280 },
+  { note: N.FS4, dur: 440 },
+  { note: N.FS4, dur: 260 },
+  { note: N.FS4, dur: 260 },
+  { note: N.FS4, dur: 260 },
+  { note: N.FS4, dur: 260 },
+  { note: N.E4,  dur: 260 },
+  { note: N.E4,  dur: 260 },
+  { note: N.D4,  dur: 260 },
+  { note: N.E4,  dur: 300 },
+  { note: N.FS4, dur: 700 },
+  { note: null,  dur: 240 },
+
+  // "I'll be wait-ing, all there's left to do is run"
+  { note: N.FS4, dur: 260, bass: N.A3, lyric: "“I'll be waiting, all there's left to do is run...” ✨" },
+  { note: N.FS4, dur: 260 },
+  { note: N.G4,  dur: 320 },
+  { note: N.FS4, dur: 320 },
+  { note: N.E4,  dur: 260 },
+  { note: N.D4,  dur: 260 },
+  { note: N.D4,  dur: 260 },
+  { note: N.D4,  dur: 260 },
+  { note: N.E4,  dur: 300 },
+  { note: N.FS4, dur: 300 },
+  { note: N.E4,  dur: 750 },
+  { note: null,  dur: 240 },
+
+  // "You'll be the prince and I'll be the prin-cess"
+  { note: N.FS4, dur: 240, bass: N.B3, lyric: "“You'll be the prince and I'll be the princess...” 👑" },
+  { note: N.FS4, dur: 240 },
+  { note: N.FS4, dur: 200 },
+  { note: N.A4,  dur: 400 },
+  { note: N.FS4, dur: 200 },
+  { note: N.FS4, dur: 240 },
+  { note: N.FS4, dur: 240 },
+  { note: N.FS4, dur: 200 },
+  { note: N.A4,  dur: 400 },
+  { note: N.FS4, dur: 600 },
+  { note: null,  dur: 240 },
+
+  // "It's a love sto-ry, ba-by, just say, 'Yes'"
+  { note: N.FS4, dur: 240, bass: N.G3, lyric: "“It's a love story, baby, just say 'Yes'...” 💖" },
+  { note: N.G4,  dur: 240 },
+  { note: N.A4,  dur: 350 },
+  { note: N.FS4, dur: 350 },
+  { note: N.E4,  dur: 280 },
+  { note: N.D4,  dur: 280 },
+  { note: N.E4,  dur: 320 },
+  { note: N.FS4, dur: 300 },
+  { note: N.E4,  dur: 400 },
+  { note: N.D4,  dur: 1100, bass: N.D3 },
+  { note: null,  dur: 800 } // loop pause
+];
+
+// Toggle music on/off
+async function toggleMusic() {
+  if (isPlayingMusic) {
+    stopMusic();
   } else {
-    startMelody();
+    await startMusic();
   }
 }
 
-function startMelody() {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) {
-      showToast('Audio not supported on this browser');
+async function startMusic() {
+  isPlayingMusic = true;
+  updateMusicUI(true);
+
+  // Check if we have audio file loaded (Blob or Source)
+  if (dom.bgMusic && dom.bgMusic.src && dom.bgMusic.src.trim() !== '') {
+    dom.bgMusic.volume = musicVolume;
+    try {
+      await dom.bgMusic.play();
+      showToast('Playing Taylor Swift - Love Story 🎵');
       return;
+    } catch (err) {
+      console.warn('Audio play failed, falling back to music box synth:', err);
     }
-    if (!audioContext) {
-      audioContext = new AudioCtx();
-    }
-    if (audioContext.state === 'suspended') {
-      audioContext.resume();
-    }
-
-    isPlayingMelody = true;
-    dom.musicToggleBtn.classList.add('playing');
-    showToast('Playing romantic melody 🎶');
-
-    // Sweet pentatonic music box notes (C major / A minor warm scale)
-    const notes = [
-      261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25
-    ];
-    const melodyPattern = [0, 2, 4, 2, 5, 4, 2, 0, 3, 5, 7, 5, 4, 2, 4, 0];
-    let noteIdx = 0;
-
-    melodyInterval = setInterval(() => {
-      if (!isPlayingMelody) return;
-      const freq = notes[melodyPattern[noteIdx % melodyPattern.length]];
-      playTone(freq, 0.45);
-      noteIdx++;
-    }, 450);
-  } catch (err) {
-    console.error('Audio error:', err);
   }
+
+  // Fallback / Default: Sweet synthesized music box version of Love Story!
+  startSynthChorus();
+  showToast('Playing Love Story - Music Box Edition 🎶');
 }
 
-function stopMelody() {
-  isPlayingMelody = false;
-  if (melodyInterval) clearInterval(melodyInterval);
-  dom.musicToggleBtn.classList.remove('playing');
+function stopMusic() {
+  isPlayingMusic = false;
+  updateMusicUI(false);
+
+  if (dom.bgMusic) {
+    dom.bgMusic.pause();
+  }
+  if (synthTimeoutId) {
+    clearTimeout(synthTimeoutId);
+    synthTimeoutId = null;
+  }
+  dom.songLyrics.textContent = "“Romeo, take me somewhere we can be alone...” 💕";
   showToast('Music paused 🎵');
 }
 
-function playTone(freq, duration = 0.5) {
+function updateMusicUI(playing) {
+  if (playing) {
+    dom.musicToggleBtn.classList.add('playing');
+    dom.vinylDisc.classList.add('spinning');
+    dom.musicPillPlayBtn.classList.add('playing');
+    dom.playIcon.textContent = "⏸";
+    dom.playText.textContent = "Pause";
+  } else {
+    dom.musicToggleBtn.classList.remove('playing');
+    dom.vinylDisc.classList.remove('spinning');
+    dom.musicPillPlayBtn.classList.remove('playing');
+    dom.playIcon.textContent = "▶";
+    dom.playText.textContent = "Play";
+  }
+}
+
+// Synthesize Love Story chorus with rich music-box sound
+let synthNoteIdx = 0;
+function startSynthChorus() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!audioContext) audioContext = new AudioCtx();
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    synthNoteIdx = 0;
+    playNextSynthNote();
+  } catch (e) {
+    console.error('Web Audio error:', e);
+  }
+}
+
+function playNextSynthNote() {
+  if (!isPlayingMusic) return;
+
+  const item = LOVE_STORY_CHORUS[synthNoteIdx % LOVE_STORY_CHORUS.length];
+  synthNoteIdx++;
+
+  if (item.lyric) {
+    dom.songLyrics.textContent = item.lyric;
+  }
+
+  // Play bass root chord note if defined
+  if (item.bass) {
+    playBellTone(item.bass, 0.9, 0.05 * musicVolume, 'triangle');
+  }
+
+  // Play lead melody bell note
+  if (item.note) {
+    playBellTone(item.note, 0.6, 0.1 * musicVolume, 'sine');
+    // Soft octave sparkle overtone
+    playBellTone(item.note * 2, 0.35, 0.03 * musicVolume, 'sine');
+  }
+
+  synthTimeoutId = setTimeout(playNextSynthNote, item.dur || 300);
+}
+
+// Bell / Music-box tone generator
+function playBellTone(freq, duration = 0.5, volume = 0.08, type = 'sine') {
   if (!audioContext) return;
+  const now = audioContext.currentTime;
+
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
 
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
 
-  gain.gain.setValueAtTime(0.001, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+  // Music box sharp attack and smooth exponential decay
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(volume, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
   osc.connect(gain);
   gain.connect(audioContext.destination);
 
-  osc.start();
-  osc.stop(audioContext.currentTime + duration);
+  osc.start(now);
+  osc.stop(now + duration + 0.05);
 }
+
+// Handle MP3 upload from device
+async function handleCustomAudioUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    const arrayBuffer = evt.target.result;
+    const blob = new Blob([arrayBuffer], { type: file.type || 'audio/mpeg' });
+    
+    // Save to IndexedDB
+    await db.saveMedia('custom_bg_audio', blob);
+    setAudioBlob(blob);
+    dom.removeCustomAudioBtn.classList.remove('hidden');
+    dom.musicModeStatus.innerHTML = `<span>🎵 Custom Audio: <strong>${escapeHtml(file.name)}</strong></span>`;
+    showToast('Taylor Swift MP3 saved successfully! 💕');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setAudioBlob(blob) {
+  if (customAudioBlobUrl) URL.revokeObjectURL(customAudioBlobUrl);
+  customAudioBlobUrl = URL.createObjectURL(blob);
+  setAudioSource(customAudioBlobUrl);
+}
+
+function setAudioSource(src) {
+  if (!dom.bgMusic) return;
+  dom.bgMusic.src = src;
+  dom.bgMusic.load();
+}
+
+async function resetCustomAudio() {
+  await db.saveMedia('custom_bg_audio', null);
+  await db.saveSetting('customAudioUrl', null);
+  if (customAudioBlobUrl) {
+    URL.revokeObjectURL(customAudioBlobUrl);
+    customAudioBlobUrl = null;
+  }
+  dom.bgMusic.src = 'assets/love-story.mp3';
+  dom.removeCustomAudioBtn.classList.add('hidden');
+  dom.musicModeStatus.innerHTML = `<span>✨ Built-in Love Story Chorus (Music Box Synth)</span>`;
+  showToast('Reset to built-in Love Story music box 🎶');
+}
+
+// Load saved custom audio on startup
+async function initSavedAudio() {
+  try {
+    const savedBlob = await db.getMedia('custom_bg_audio');
+    if (savedBlob && savedBlob.size > 0) {
+      setAudioBlob(savedBlob);
+      dom.removeCustomAudioBtn.classList.remove('hidden');
+      dom.musicModeStatus.innerHTML = `<span>🎵 Custom Audio Loaded</span>`;
+      return;
+    }
+
+    const savedUrl = await db.getSetting('customAudioUrl');
+    if (savedUrl) {
+      setAudioSource(savedUrl);
+      dom.customAudioUrlInput.value = savedUrl;
+      dom.removeCustomAudioBtn.classList.remove('hidden');
+      dom.musicModeStatus.innerHTML = `<span>🎵 Audio URL: ${escapeHtml(savedUrl)}</span>`;
+    }
+  } catch (err) {
+    console.error('Audio init error:', err);
+  }
+}
+
+// Call on startup
+document.addEventListener('DOMContentLoaded', () => {
+  initSavedAudio();
+});
 
 // =====================================================
 // UTILITIES

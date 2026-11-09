@@ -1,8 +1,9 @@
 // IndexedDB helper for storing memories and photos persistently without localStorage 5MB limit
 const DB_NAME = 'OurLoveStoryDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'memories';
 const SETTINGS_STORE = 'settings';
+const MEDIA_STORE = 'media';
 
 class LoveStoryDB {
   constructor() {
@@ -23,6 +24,9 @@ class LoveStoryDB {
         if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
           db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
         }
+        if (!db.objectStoreNames.contains(MEDIA_STORE)) {
+          db.createObjectStore(MEDIA_STORE, { keyPath: 'id' });
+        }
       };
 
       request.onsuccess = (event) => {
@@ -34,6 +38,32 @@ class LoveStoryDB {
         console.error('IndexedDB error:', event.target.error);
         reject(event.target.error);
       };
+    });
+  }
+
+  async saveMedia(id, blobOrData) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([MEDIA_STORE], 'readwrite');
+      const store = tx.objectStore(MEDIA_STORE);
+      const request = store.put({ id, data: blobOrData });
+
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getMedia(id) {
+    await this.init();
+    return new Promise((resolve) => {
+      const tx = this.db.transaction([MEDIA_STORE], 'readonly');
+      const store = tx.objectStore(MEDIA_STORE);
+      const request = store.get(id);
+
+      request.onsuccess = () => {
+        resolve(request.result ? request.result.data : null);
+      };
+      request.onerror = () => resolve(null);
     });
   }
 
