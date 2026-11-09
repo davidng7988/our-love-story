@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Our Love Story 💕 - Forever & Always</title>
+  <meta name="description" content="A warm, lovely countdown of our days together and our cherished memories.">
+  <meta name="theme-color" content="#ffe8ee">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Floating background particles -->
+  <canvas id="heartCanvas" class="heart-canvas"></canvas>
+
+  <!-- Top App Bar -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="logo-area">
+        <span class="heart-sparkle">💖</span>
+        <span class="logo-text">Our Story</span>
+      </div>
+      <div class="header-actions">
+        <button id="musicToggleBtn" class="icon-btn" title="Romantic Melody" aria-label="Toggle Music">
+          <span class="music-note">🎵</span>
+        </button>
+        <button id="heartBurstBtn" class="icon-btn love-btn" title="Send Love" aria-label="Send Love">
+          <span>💕</span>
+        </button>
+        <button id="openAdminBtn" class="icon-btn admin-btn" title="Admin Console" aria-label="Admin Settings">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Mobile Container -->
+  <main class="app-container">
+    
+    <!-- Hero / Love Counter Section -->
+    <section class="hero-section">
+      <div class="floating-badge">
+        <span class="pulse-dot"></span>
+        <span>Every second with you is a gift ✨</span>
+      </div>
+
+      <div class="couple-card">
+        <div class="couple-avatars">
+          <div class="avatar-ring avatar-1">
+            <span class="avatar-emoji">👦🏻</span>
+            <span class="partner-name-tag" id="partnerOneDisplay">David</span>
+          </div>
+          <div class="heart-connector">
+            <span class="beating-heart">❤️</span>
+            <div class="heart-waves">
+              <span></span><span></span>
+            </div>
+          </div>
+          <div class="avatar-ring avatar-2">
+            <span class="avatar-emoji">👧🏻</span>
+            <span class="partner-name-tag" id="partnerTwoDisplay">My Love</span>
+          </div>
+        </div>
+
+        <h1 class="couple-title">
+          <span id="titlePartnerOne">David</span> & <span id="titlePartnerTwo">My Love</span>
+        </h1>
+        <p class="anniversary-subtitle">We have been together for</p>
+
+        <!-- Live Real-Time Ticking Counter -->
+        <div class="timer-grid">
+          <div class="timer-box">
+            <div class="timer-digit" id="valYears">0</div>
+            <div class="timer-label">Years</div>
+          </div>
+          <div class="timer-box">
+            <div class="timer-digit" id="valMonths">0</div>
+            <div class="timer-label">Months</div>
+          </div>
+          <div class="timer-box">
+            <div class="timer-digit" id="valDays">0</div>
+            <div class="timer-label">Days</div>
+          </div>
+          <div class="timer-box">
+            <div class="timer-digit" id="valHours">00</div>
+            <div class="timer-label">Hours</div>
+          </div>
+          <div class="timer-box">
+            <div class="timer-digit" id="valMinutes">00</div>
+            <div class="timer-label">Minutes</div>
+          </div>
+          <div class="timer-box highlight-box">
+            <div class="timer-digit pulse-digit" id="valSeconds">00</div>
+            <div class="timer-label">Seconds</div>
+          </div>
+        </div>
+
+        <!-- Highlight Total Days Pill & Date Baseline -->
+        <div class="milestone-pill">
+          <span class="milestone-icon">✨</span>
+          <span class="milestone-text">
+            Together for <strong id="totalDaysCount">0</strong> days & <strong id="totalHoursCount">0</strong> hours
+          </span>
+        </div>
+
+        <div class="baseline-date-tag">
+          <span>🗓️ Since</span>
+          <strong id="baselineDateDisplay">April 27, 2024 at 11:34 PM</strong>
+        </div>
+
+        <div class="love-quote-card">
+          <span class="quote-mark">“</span>
+          <p id="quoteDisplay">Every second with you is my favorite memory, and forever is just the beginning.</p>
+          <span class="quote-mark end-quote">”</span>
+        </div>
+
+        <a href="#memoriesSection" class="scroll-down-btn" id="scrollDownBtn">
+          <span>Explore Our Memories</span>
+          <span class="down-arrow">↓</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Memories Timeline Section -->
+    <section class="memories-section" id="memoriesSection">
+      <div class="section-header">
+        <span class="section-tag">Our Precious Journey 📸</span>
+        <h2 class="section-title">Cherished Memories</h2>
+        <p class="section-desc">Every smile, every road trip, and every unforgettable moment we've shared.</p>
+        
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+          <button class="filter-btn active" data-filter="all">All Memories (<span id="countAll">5</span>)</button>
+          <button class="filter-btn" data-filter="Date">Dates 🍽️</button>
+          <button class="filter-btn" data-filter="Trip">Trips ✈️</button>
+        </div>
+      </div>
+
+      <!-- Timeline Container -->
+      <div class="timeline-container" id="timelineContainer">
+        <!-- Dynamic memory cards will be rendered here -->
+      </div>
+
+      <!-- Add New Memory Card Banner at the bottom -->
+      <div class="add-memory-banner">
+        <div class="add-banner-inner">
+          <div class="add-banner-icon">🌸</div>
+          <h3>More Memories Ahead!</h3>
+          <p>Our story is still being written together. Tap below to capture a new date, trip, or special moment!</p>
+          <button class="btn primary-btn add-btn" id="openAddMemoryBtn">
+            <span>➕</span> Add a New Memory
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-heart">💕</div>
+      <p>Made with all my heart for you</p>
+      <div class="footer-actions">
+        <button class="footer-link-btn" id="adminFooterBtn">Admin & Photo Upload ⚙️</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Lightbox Modal for Fullscreen Photo View -->
+  <div class="modal" id="lightboxModal" aria-hidden="true">
+    <div class="modal-backdrop" id="lightboxBackdrop"></div>
+    <div class="lightbox-content">
+      <button class="modal-close-btn" id="lightboxCloseBtn">&times;</button>
+      <div class="lightbox-img-wrapper">
+        <img id="lightboxImg" src="" alt="Memory full view">
+      </div>
+      <div class="lightbox-details">
+        <span class="badge" id="lightboxBadge">Date</span>
+        <h3 id="lightboxTitle"></h3>
+        <p class="lightbox-loc" id="lightboxLocation"></p>
+        <p class="lightbox-desc" id="lightboxDesc"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin & Upload Console Modal -->
+  <div class="modal modal-sheet" id="adminModal" aria-hidden="true">
+    <div class="modal-backdrop" id="adminBackdrop"></div>
+    <div class="sheet-container">
+      <div class="sheet-handle"></div>
+      
+      <div class="sheet-header">
+        <div class="sheet-title-group">
+          <h2>⚙️ Admin & Photo Console</h2>
+          <p>Customize names, anniversary date & upload photos directly</p>
+        </div>
+        <button class="sheet-close-btn" id="adminCloseBtn">&times;</button>
+      </div>
+
+      <div class="sheet-tabs">
+        <button class="sheet-tab-btn active" data-tab="memoriesTab">📸 Memories & Photos</button>
+        <button class="sheet-tab-btn" data-tab="settingsTab">💑 Couple Settings</button>
+        <button class="sheet-tab-btn" data-tab="backupTab">💾 Export / Backup</button>
+      </div>
+
+      <div class="sheet-body">
+        
+        <!-- TAB 1: Memories & Image Uploads -->
+        <div class="sheet-tab-content active" id="memoriesTab">
+          <div class="admin-action-row">
+            <span class="admin-section-label">Manage Your Moments</span>
+            <button class="btn primary-btn small-btn" id="adminAddNewBtn">
+              <span>➕</span> Add New
+            </button>
+          </div>
+
+          <div class="admin-memories-list" id="adminMemoriesList">
+            <!-- Dynamically populated list of memories for photo upload / edit -->
+          </div>
+        </div>
+
+        <!-- TAB 2: Couple Settings -->
+        <div class="sheet-tab-content" id="settingsTab">
+          <form id="settingsForm" class="settings-form">
+            <div class="form-group">
+              <label for="partnerOneInput">His Name</label>
+              <input type="text" id="partnerOneInput" class="form-control" placeholder="e.g. David" required>
+            </div>
+
+            <div class="form-group">
+              <label for="partnerTwoInput">Her Name</label>
+              <input type="text" id="partnerTwoInput" class="form-control" placeholder="e.g. My Love" required>
+            </div>
+
+            <div class="form-group">
+              <label for="togetherDateInput">Together Baseline Date & Time</label>
+              <input type="datetime-local" id="togetherDateInput" class="form-control" required>
+              <small class="form-hint">Set to 2024-04-27 23:34 (April 27, 2024 at 11:34 PM)</small>
+            </div>
+
+            <div class="form-group">
+              <label for="quoteInput">Love Note / Quote</label>
+              <textarea id="quoteInput" class="form-control" rows="3" placeholder="A sweet quote that displays on the home card..."></textarea>
+            </div>
+
+            <div class="form-btn-row">
+              <button type="submit" class="btn primary-btn full-btn">Save Couple Settings 💕</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 3: Backup & GitHub Sync -->
+        <div class="sheet-tab-content" id="backupTab">
+          <div class="backup-box">
+            <h4>💾 Export & Sync</h4>
+            <p>Export your memories as JSON data to backup or embed permanently into your GitHub repository so all devices see uploaded photos.</p>
+            <div class="backup-actions">
+              <button class="btn secondary-btn" id="exportJsonBtn">Download Memories JSON</button>
+              <button class="btn secondary-btn" id="copyJsonBtn">Copy JSON to Clipboard</button>
+            </div>
+            
+            <hr class="form-divider">
+            
+            <h4>📥 Import Memories</h4>
+            <p>Restore memories from a JSON file:</p>
+            <input type="file" id="importJsonFileInput" accept=".json" style="display: none;">
+            <button class="btn outline-btn" id="triggerImportBtn">Choose JSON File to Import</button>
+
+            <hr class="form-divider">
+
+            <h4>🔄 Reset to Defaults</h4>
+            <p class="danger-text">Reset all memories and settings to the original default setup:</p>
+            <button class="btn danger-btn" id="resetDefaultsBtn">Reset All Data</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Memory Modal -->
+  <div class="modal modal-sheet" id="editMemoryModal" aria-hidden="true">
+    <div class="modal-backdrop" id="editMemoryBackdrop"></div>
+    <div class="sheet-container">
+      <div class="sheet-handle"></div>
+      
+      <div class="sheet-header">
+        <h2 id="editModalHeading">Add New Memory 💕</h2>
+        <button class="sheet-close-btn" id="editModalCloseBtn">&times;</button>
+      </div>
+
+      <div class="sheet-body">
+        <form id="memoryForm" class="settings-form">
+          <input type="hidden" id="memoryId">
+
+          <!-- Image Upload / Preview Area -->
+          <div class="form-group">
+            <label>Memory Photo 📸</label>
+            <div class="image-upload-dropzone" id="dropzone">
+              <img id="imagePreview" class="image-preview hidden" src="" alt="Photo preview">
+              <div class="dropzone-placeholder" id="dropzonePlaceholder">
+                <span class="camera-icon">📷</span>
+                <span class="upload-title">Tap to choose or take a photo</span>
+                <span class="upload-sub">Supports JPG, PNG, WEBP from your phone</span>
+              </div>
+              <input type="file" id="imageFileInput" accept="image/*" class="file-input-hidden">
+            </div>
+            <div class="image-preview-actions hidden" id="previewActions">
+              <button type="button" class="btn outline-btn small-btn" id="changePhotoBtn">Change Photo</button>
+              <button type="button" class="btn danger-btn small-btn" id="removePhotoBtn">Remove Photo</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="memoryTitle">Title *</label>
+            <input type="text" id="memoryTitle" class="form-control" placeholder="e.g. Sunset Walk by the Beach" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-half">
+              <label for="memoryCategory">Category</label>
+              <select id="memoryCategory" class="form-control">
+                <option value="Date">🍽️ Date</option>
+                <option value="Trip">✈️ Trip</option>
+                <option value="First Date">💖 First Date</option>
+                <option value="Milestone">🎉 Milestone</option>
+                <option value="Special Moment">✨ Special Moment</option>
+              </select>
+            </div>
+            <div class="form-group col-half">
+              <label for="memoryDate">Date</label>
+              <input type="date" id="memoryDate" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="memoryLocation">Location</label>
+            <input type="text" id="memoryLocation" class="form-control" placeholder="e.g. Manjalara, Genting, Singapore...">
+          </div>
+
+          <div class="form-group">
+            <label for="memoryDescription">Our Story / Sweet Note</label>
+            <textarea id="memoryDescription" class="form-control" rows="4" placeholder="What happened on this day? How did it feel? Write something sweet..."></textarea>
+          </div>
+
+          <div class="form-btn-row">
+            <button type="submit" class="btn primary-btn full-btn" id="saveMemorySubmitBtn">Save Memory 💕</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Scripts -->
+  <script src="db.js"></script>
+  <script src="default-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

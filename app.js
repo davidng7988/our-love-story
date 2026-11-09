@@ -1,0 +1,1018 @@
+// =====================================================
+// OUR LOVE STORY - APPLICATION LOGIC
+// =====================================================
+
+let currentSettings = { ...DEFAULT_SETTINGS };
+let currentMemories = [...DEFAULT_MEMORIES];
+let currentFilter = 'all';
+let audioContext = null;
+let isPlayingMelody = false;
+let melodyInterval = null;
+
+// DOM Elements
+const dom = {
+  // Timer & Couple Display
+  partnerOneDisplay: document.getElementById('partnerOneDisplay'),
+  partnerTwoDisplay: document.getElementById('partnerTwoDisplay'),
+  titlePartnerOne: document.getElementById('titlePartnerOne'),
+  titlePartnerTwo: document.getElementById('titlePartnerTwo'),
+  baselineDateDisplay: document.getElementById('baselineDateDisplay'),
+  quoteDisplay: document.getElementById('quoteDisplay'),
+  valYears: document.getElementById('valYears'),
+  valMonths: document.getElementById('valMonths'),
+  valDays: document.getElementById('valDays'),
+  valHours: document.getElementById('valHours'),
+  valMinutes: document.getElementById('valMinutes'),
+  valSeconds: document.getElementById('valSeconds'),
+  totalDaysCount: document.getElementById('totalDaysCount'),
+  totalHoursCount: document.getElementById('totalHoursCount'),
+
+  // Timeline
+  timelineContainer: document.getElementById('timelineContainer'),
+  countAll: document.getElementById('countAll'),
+  filterBtns: document.querySelectorAll('.filter-btn'),
+  openAddMemoryBtn: document.getElementById('openAddMemoryBtn'),
+
+  // Header & Floating
+  musicToggleBtn: document.getElementById('musicToggleBtn'),
+  heartBurstBtn: document.getElementById('heartBurstBtn'),
+  openAdminBtn: document.getElementById('openAdminBtn'),
+  adminFooterBtn: document.getElementById('adminFooterBtn'),
+
+  // Modals
+  adminModal: document.getElementById('adminModal'),
+  adminCloseBtn: document.getElementById('adminCloseBtn'),
+  adminBackdrop: document.getElementById('adminBackdrop'),
+  adminMemoriesList: document.getElementById('adminMemoriesList'),
+  adminAddNewBtn: document.getElementById('adminAddNewBtn'),
+  sheetTabBtns: document.querySelectorAll('.sheet-tab-btn'),
+  sheetTabContents: document.querySelectorAll('.sheet-tab-content'),
+
+  // Settings Form
+  settingsForm: document.getElementById('settingsForm'),
+  partnerOneInput: document.getElementById('partnerOneInput'),
+  partnerTwoInput: document.getElementById('partnerTwoInput'),
+  togetherDateInput: document.getElementById('togetherDateInput'),
+  quoteInput: document.getElementById('quoteInput'),
+
+  // Memory Form Modal
+  editMemoryModal: document.getElementById('editMemoryModal'),
+  editModalCloseBtn: document.getElementById('editModalCloseBtn'),
+  editMemoryBackdrop: document.getElementById('editMemoryBackdrop'),
+  editModalHeading: document.getElementById('editModalHeading'),
+  memoryForm: document.getElementById('memoryForm'),
+  memoryId: document.getElementById('memoryId'),
+  memoryTitle: document.getElementById('memoryTitle'),
+  memoryCategory: document.getElementById('memoryCategory'),
+  memoryDate: document.getElementById('memoryDate'),
+  memoryLocation: document.getElementById('memoryLocation'),
+  memoryDescription: document.getElementById('memoryDescription'),
+  imageFileInput: document.getElementById('imageFileInput'),
+  dropzone: document.getElementById('dropzone'),
+  dropzonePlaceholder: document.getElementById('dropzonePlaceholder'),
+  imagePreview: document.getElementById('imagePreview'),
+  previewActions: document.getElementById('previewActions'),
+  changePhotoBtn: document.getElementById('changePhotoBtn'),
+  removePhotoBtn: document.getElementById('removePhotoBtn'),
+
+  // Lightbox
+  lightboxModal: document.getElementById('lightboxModal'),
+  lightboxBackdrop: document.getElementById('lightboxBackdrop'),
+  lightboxCloseBtn: document.getElementById('lightboxCloseBtn'),
+  lightboxImg: document.getElementById('lightboxImg'),
+  lightboxTitle: document.getElementById('lightboxTitle'),
+  lightboxLocation: document.getElementById('lightboxLocation'),
+  lightboxDesc: document.getElementById('lightboxDesc'),
+  lightboxBadge: document.getElementById('lightboxBadge'),
+
+  // Backup & Import
+  exportJsonBtn: document.getElementById('exportJsonBtn'),
+  copyJsonBtn: document.getElementById('copyJsonBtn'),
+  importJsonFileInput: document.getElementById('importJsonFileInput'),
+  triggerImportBtn: document.getElementById('triggerImportBtn'),
+  resetDefaultsBtn: document.getElementById('resetDefaultsBtn'),
+
+  // Toast
+  toast: document.getElementById('toast'),
+  heartCanvas: document.getElementById('heartCanvas')
+};
+
+// =====================================================
+// INITIALIZATION
+// =====================================================
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadData();
+  setupCountdown();
+  renderTimeline();
+  setupCanvasParticles();
+  setupEventListeners();
+  renderAdminMemoriesList();
+  populateSettingsForm();
+});
+
+// Load settings and memories from IndexedDB
+async function loadData() {
+  try {
+    const savedSettings = await db.getSetting('coupleSettings');
+    if (savedSettings) {
+      currentSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+    }
+
+    const savedMemories = await db.getAllMemories();
+    if (savedMemories && savedMemories.length > 0) {
+      currentMemories = savedMemories.sort((a, b) => (a.order || 0) - (b.order || 0));
+    } else {
+      // Seed default memories into IndexedDB
+      for (const mem of DEFAULT_MEMORIES) {
+        await db.saveMemory(mem);
+      }
+      currentMemories = [...DEFAULT_MEMORIES];
+    }
+  } catch (err) {
+    console.error('Error loading data from DB:', err);
+    currentSettings = { ...DEFAULT_SETTINGS };
+    currentMemories = [...DEFAULT_MEMORIES];
+  }
+
+  updateCoupleDisplays();
+}
+
+// Update couple titles & names across the UI
+function updateCoupleDisplays() {
+  const p1 = currentSettings.partnerOne || 'David';
+  const p2 = currentSettings.partnerTwo || 'My Love';
+
+  dom.partnerOneDisplay.textContent = p1;
+  dom.partnerTwoDisplay.textContent = p2;
+  dom.titlePartnerOne.textContent = p1;
+  dom.titlePartnerTwo.textContent = p2;
+
+  if (dom.quoteDisplay) {
+    dom.quoteDisplay.textContent = currentSettings.loveQuote || DEFAULT_SETTINGS.loveQuote;
+  }
+
+  // Format baseline date display nicely
+  const dt = new Date(currentSettings.togetherDate);
+  const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  dom.baselineDateDisplay.textContent = isNaN(dt.getTime())
+    ? "April 27, 2024 at 11:34 PM"
+    : dt.toLocaleDateString('en-US', options);
+}
+
+// =====================================================
+// COUNTDOWN CALCULATION ENGINE
+// =====================================================
+function calculateAccurateDifference(startDateStr) {
+  const start = new Date(startDateStr);
+  const end = new Date();
+
+  if (isNaN(start.getTime()) || end < start) {
+    return {
+      years: 0, months: 0, days: 0,
+      hours: 0, minutes: 0, seconds: 0,
+      totalDays: 0, totalHours: 0
+    };
+  }
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  let days = end.getDate() - start.getDate();
+  let hours = end.getHours() - start.getHours();
+  let minutes = end.getMinutes() - start.getMinutes();
+  let seconds = end.getSeconds() - start.getSeconds();
+
+  if (seconds < 0) {
+    seconds += 60;
+    minutes--;
+  }
+  if (minutes < 0) {
+    minutes += 60;
+    hours--;
+  }
+  if (hours < 0) {
+    hours += 24;
+    days--;
+  }
+  if (days < 0) {
+    // Days in previous month
+    const prevMonthDays = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+    days += prevMonthDays;
+    months--;
+  }
+  if (months < 0) {
+    months += 12;
+    years--;
+  }
+
+  const diffMs = end.getTime() - start.getTime();
+  const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+  return {
+    years,
+    months,
+    days,
+    hours: hours < 10 ? '0' + hours : hours,
+    minutes: minutes < 10 ? '0' + minutes : minutes,
+    seconds: seconds < 10 ? '0' + seconds : seconds,
+    totalDays: totalDays.toLocaleString(),
+    totalHours: totalHours.toLocaleString()
+  };
+}
+
+function updateCountdownDOM() {
+  const diff = calculateAccurateDifference(currentSettings.togetherDate || DEFAULT_SETTINGS.togetherDate);
+
+  dom.valYears.textContent = diff.years;
+  dom.valMonths.textContent = diff.months;
+  dom.valDays.textContent = diff.days;
+  dom.valHours.textContent = diff.hours;
+  dom.valMinutes.textContent = diff.minutes;
+  dom.valSeconds.textContent = diff.seconds;
+
+  dom.totalDaysCount.textContent = diff.totalDays;
+  dom.totalHoursCount.textContent = diff.totalHours;
+}
+
+function setupCountdown() {
+  updateCountdownDOM();
+  setInterval(updateCountdownDOM, 1000);
+}
+
+// =====================================================
+// TIMELINE MEMORIES RENDERER
+// =====================================================
+function renderTimeline() {
+  dom.timelineContainer.innerHTML = '';
+
+  const filtered = currentMemories.filter(m => {
+    if (currentFilter === 'all') return true;
+    return (m.category || '').toLowerCase().includes(currentFilter.toLowerCase());
+  });
+
+  dom.countAll.textContent = currentMemories.length;
+
+  if (filtered.length === 0) {
+    dom.timelineContainer.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: #9c7a82;">
+        <span style="font-size: 2rem;">🌸</span>
+        <p style="margin-top: 10px; font-weight: 600;">No memories in this category yet.</p>
+      </div>
+    `;
+    return;
+  }
+
+  filtered.forEach((memory, idx) => {
+    const item = document.createElement('div');
+    item.className = 'memory-item';
+
+    const hasPhoto = memory.image && memory.image.trim() !== '';
+
+    // Choose cute category emoji
+    const catIcon = memory.categoryIcon || (memory.category === 'Trip' ? '✈️' : '🍽️');
+    const orderNum = idx + 1;
+
+    item.innerHTML = `
+      <div class="timeline-node">❤️</div>
+      <div class="memory-card" data-id="${memory.id}">
+        <div class="card-top-row">
+          <span class="category-badge">${catIcon} ${escapeHtml(memory.category || 'Memory')}</span>
+          <span class="memory-order-badge">#${orderNum}</span>
+        </div>
+
+        <!-- Polaroid Photo / Placeholder Area -->
+        <div class="polaroid-frame" data-action="${hasPhoto ? 'zoom' : 'upload'}" data-id="${memory.id}">
+          <div class="polaroid-img-wrapper">
+            ${
+              hasPhoto
+                ? `<img class="polaroid-img" src="${memory.image}" alt="${escapeHtml(memory.title)}" loading="lazy">`
+                : `
+                <div class="photo-placeholder">
+                  <span class="placeholder-icon">📸</span>
+                  <span class="placeholder-title">Add Our Photo</span>
+                  <span class="placeholder-sub">Tap here to insert your sweet photo 💕</span>
+                </div>
+                `
+            }
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="memory-date-loc">
+            <span>🗓️ ${escapeHtml(memory.displayDate || memory.date || '')}</span>
+            ${
+              memory.location
+                ? `<span>•</span> <a class="loc-pill" href="${memory.locationUrl || `https://maps.google.com/?q=${encodeURIComponent(memory.location)}`}" target="_blank" rel="noopener">📍 ${escapeHtml(memory.location)}</a>`
+                : ''
+            }
+          </div>
+
+          <h3 class="memory-title">${escapeHtml(memory.title)}</h3>
+          <p class="memory-description">${escapeHtml(memory.description || '')}</p>
+
+          <div class="card-action-bar">
+            <button class="heart-react-btn" data-id="${memory.id}" title="Send Heart">
+              <span>💖</span> <span class="react-count">${memory.likes || 1}</span>
+            </button>
+            <button class="edit-single-btn" data-id="${memory.id}" title="Edit Memory or Photo">
+              <span>✏️ Edit / Photo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    dom.timelineContainer.appendChild(item);
+  });
+
+  attachCardEvents();
+}
+
+function attachCardEvents() {
+  // Polaroid Click
+  document.querySelectorAll('.polaroid-frame').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-id');
+      const action = el.getAttribute('data-action');
+      const mem = currentMemories.find(m => m.id === id);
+      if (!mem) return;
+
+      if (action === 'zoom' && mem.image) {
+        openLightbox(mem);
+      } else {
+        openEditModal(mem);
+      }
+    });
+  });
+
+  // Heart React Button
+  document.querySelectorAll('.heart-react-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      const mem = currentMemories.find(m => m.id === id);
+      if (!mem) return;
+
+      mem.likes = (mem.likes || 1) + 1;
+      btn.querySelector('.react-count').textContent = mem.likes;
+      await db.saveMemory(mem);
+
+      // Create burst at button
+      const rect = btn.getBoundingClientRect();
+      createHeartBurst(rect.left + rect.width / 2, rect.top);
+      showToast('Sent love to this memory! 💕');
+    });
+  });
+
+  // Edit Single Button
+  document.querySelectorAll('.edit-single-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      const mem = currentMemories.find(m => m.id === id);
+      if (mem) openEditModal(mem);
+    });
+  });
+}
+
+// =====================================================
+// LIGHTBOX FULL VIEW
+// =====================================================
+function openLightbox(memory) {
+  dom.lightboxImg.src = memory.image;
+  dom.lightboxTitle.textContent = memory.title;
+  dom.lightboxBadge.textContent = memory.category || 'Memory';
+  dom.lightboxLocation.textContent = memory.location ? `📍 ${memory.location}` : '';
+  dom.lightboxDesc.textContent = memory.description || '';
+  dom.lightboxModal.classList.add('active');
+  dom.lightboxModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeLightbox() {
+  dom.lightboxModal.classList.remove('active');
+  dom.lightboxModal.setAttribute('aria-hidden', 'true');
+}
+
+// =====================================================
+// ADMIN CONSOLE & MEMORY MANAGEMENT
+// =====================================================
+function openAdminModal() {
+  renderAdminMemoriesList();
+  populateSettingsForm();
+  dom.adminModal.classList.add('active');
+  dom.adminModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeAdminModal() {
+  dom.adminModal.classList.remove('active');
+  dom.adminModal.setAttribute('aria-hidden', 'true');
+}
+
+function renderAdminMemoriesList() {
+  dom.adminMemoriesList.innerHTML = '';
+
+  currentMemories.forEach(mem => {
+    const card = document.createElement('div');
+    card.className = 'admin-item-card';
+
+    const thumb = mem.image
+      ? `<img src="${mem.image}" alt="${escapeHtml(mem.title)}">`
+      : `<span>📸</span>`;
+
+    card.innerHTML = `
+      <div class="admin-item-thumb">${thumb}</div>
+      <div class="admin-item-info">
+        <h4 class="admin-item-title">${escapeHtml(mem.title)}</h4>
+        <span class="admin-item-date">${escapeHtml(mem.displayDate || mem.date || '')} • ${escapeHtml(mem.location || '')}</span>
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn secondary-btn small-btn admin-edit-btn" data-id="${mem.id}">Edit</button>
+        <button class="btn danger-btn small-btn admin-delete-btn" data-id="${mem.id}">Delete</button>
+      </div>
+    `;
+
+    dom.adminMemoriesList.appendChild(card);
+  });
+
+  // Attach actions
+  dom.adminMemoriesList.querySelectorAll('.admin-edit-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.getAttribute('data-id');
+      const mem = currentMemories.find(m => m.id === id);
+      if (mem) {
+        closeAdminModal();
+        openEditModal(mem);
+      }
+    });
+  });
+
+  dom.adminMemoriesList.querySelectorAll('.admin-delete-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-id');
+      if (confirm('Are you sure you want to delete this memory?')) {
+        await deleteMemoryById(id);
+      }
+    });
+  });
+}
+
+function populateSettingsForm() {
+  dom.partnerOneInput.value = currentSettings.partnerOne || 'David';
+  dom.partnerTwoInput.value = currentSettings.partnerTwo || 'My Love';
+
+  // Format date for datetime-local (YYYY-MM-DDTHH:mm)
+  let dateVal = currentSettings.togetherDate || DEFAULT_SETTINGS.togetherDate;
+  if (dateVal.length > 16) {
+    dateVal = dateVal.substring(0, 16);
+  }
+  dom.togetherDateInput.value = dateVal;
+  dom.quoteInput.value = currentSettings.loveQuote || DEFAULT_SETTINGS.loveQuote;
+}
+
+// =====================================================
+// ADD / EDIT MEMORY MODAL & IMAGE UPLOADER
+// =====================================================
+let currentUploadedImageBase64 = '';
+
+function openEditModal(memory = null) {
+  if (memory) {
+    dom.editModalHeading.textContent = 'Edit Memory 💕';
+    dom.memoryId.value = memory.id;
+    dom.memoryTitle.value = memory.title;
+    dom.memoryCategory.value = memory.category || 'Date';
+    dom.memoryDate.value = memory.date || '';
+    dom.memoryLocation.value = memory.location || '';
+    dom.memoryDescription.value = memory.description || '';
+
+    if (memory.image) {
+      currentUploadedImageBase64 = memory.image;
+      showImagePreview(memory.image);
+    } else {
+      currentUploadedImageBase64 = '';
+      resetImagePreview();
+    }
+  } else {
+    dom.editModalHeading.textContent = 'Add New Memory 💕';
+    dom.memoryForm.reset();
+    dom.memoryId.value = '';
+    currentUploadedImageBase64 = '';
+    resetImagePreview();
+  }
+
+  dom.editMemoryModal.classList.add('active');
+  dom.editMemoryModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeEditModal() {
+  dom.editMemoryModal.classList.remove('active');
+  dom.editMemoryModal.setAttribute('aria-hidden', 'true');
+}
+
+function showImagePreview(src) {
+  dom.imagePreview.src = src;
+  dom.imagePreview.classList.remove('hidden');
+  dom.dropzonePlaceholder.classList.add('hidden');
+  dom.previewActions.classList.remove('hidden');
+}
+
+function resetImagePreview() {
+  dom.imagePreview.src = '';
+  dom.imagePreview.classList.add('hidden');
+  dom.dropzonePlaceholder.classList.remove('hidden');
+  dom.previewActions.classList.add('hidden');
+  dom.imageFileInput.value = '';
+}
+
+// Compress and read image file
+function handleImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Please select a valid image file');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Compress with max dimension 1400px
+      const canvas = document.createElement('canvas');
+      const maxDim = 1400;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      currentUploadedImageBase64 = canvas.toDataURL('image/jpeg', 0.86);
+      showImagePreview(currentUploadedImageBase64);
+      showToast('Photo uploaded & optimized! 📸');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Delete memory
+async function deleteMemoryById(id) {
+  try {
+    await db.deleteMemory(id);
+    currentMemories = currentMemories.filter(m => m.id !== id);
+    renderTimeline();
+    renderAdminMemoriesList();
+    showToast('Memory removed.');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to delete memory');
+  }
+}
+
+// =====================================================
+// EVENT LISTENERS
+// =====================================================
+function setupEventListeners() {
+  // Filter buttons
+  dom.filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      dom.filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.getAttribute('data-filter');
+      renderTimeline();
+    });
+  });
+
+  // Admin Modal Triggers
+  dom.openAdminBtn.addEventListener('click', openAdminModal);
+  dom.adminFooterBtn.addEventListener('click', openAdminModal);
+  dom.adminCloseBtn.addEventListener('click', closeAdminModal);
+  dom.adminBackdrop.addEventListener('click', closeAdminModal);
+
+  // Add Memory Modal Triggers
+  dom.openAddMemoryBtn.addEventListener('click', () => openEditModal());
+  dom.adminAddNewBtn.addEventListener('click', () => {
+    closeAdminModal();
+    openEditModal();
+  });
+  dom.editModalCloseBtn.addEventListener('click', closeEditModal);
+  dom.editMemoryBackdrop.addEventListener('click', closeEditModal);
+
+  // Lightbox Close
+  dom.lightboxCloseBtn.addEventListener('click', closeLightbox);
+  dom.lightboxBackdrop.addEventListener('click', closeLightbox);
+
+  // Tabs inside Admin Modal
+  dom.sheetTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      dom.sheetTabBtns.forEach(b => b.classList.remove('active'));
+      dom.sheetTabContents.forEach(c => c.classList.remove('active'));
+
+      btn.classList.add('active');
+      const tabId = btn.getAttribute('data-tab');
+      const content = document.getElementById(tabId);
+      if (content) content.classList.add('active');
+    });
+  });
+
+  // Image Upload Dropzone
+  dom.dropzone.addEventListener('click', () => dom.imageFileInput.click());
+  dom.imageFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleImageFile(e.target.files[0]);
+    }
+  });
+  dom.changePhotoBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dom.imageFileInput.click();
+  });
+  dom.removePhotoBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    currentUploadedImageBase64 = '';
+    resetImagePreview();
+  });
+
+  // Save Memory Form
+  dom.memoryForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const id = dom.memoryId.value || 'mem-' + Date.now();
+    const isNew = !dom.memoryId.value;
+
+    const existingMem = currentMemories.find(m => m.id === id) || {};
+
+    const updatedMemory = {
+      ...existingMem,
+      id,
+      title: dom.memoryTitle.value.trim(),
+      category: dom.memoryCategory.value,
+      categoryIcon: getCategoryIcon(dom.memoryCategory.value),
+      date: dom.memoryDate.value,
+      displayDate: dom.memoryDate.value ? formatCustomDate(dom.memoryDate.value) : 'Special Day',
+      location: dom.memoryLocation.value.trim(),
+      description: dom.memoryDescription.value.trim(),
+      image: currentUploadedImageBase64 || existingMem.image || '',
+      likes: existingMem.likes || 1,
+      order: existingMem.order || (currentMemories.length + 1)
+    };
+
+    try {
+      await db.saveMemory(updatedMemory);
+
+      if (isNew) {
+        currentMemories.push(updatedMemory);
+      } else {
+        const idx = currentMemories.findIndex(m => m.id === id);
+        if (idx !== -1) currentMemories[idx] = updatedMemory;
+      }
+
+      closeEditModal();
+      renderTimeline();
+      renderAdminMemoriesList();
+      showToast(isNew ? 'New memory added! 💕' : 'Memory updated! ✨');
+    } catch (err) {
+      console.error('Error saving memory:', err);
+      showToast('Error saving memory');
+    }
+  });
+
+  // Save Couple Settings
+  dom.settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    currentSettings.partnerOne = dom.partnerOneInput.value.trim();
+    currentSettings.partnerTwo = dom.partnerTwoInput.value.trim();
+    currentSettings.togetherDate = dom.togetherDateInput.value;
+    currentSettings.loveQuote = dom.quoteInput.value.trim();
+
+    try {
+      await db.saveSetting('coupleSettings', currentSettings);
+      updateCoupleDisplays();
+      updateCountdownDOM();
+      closeAdminModal();
+      showToast('Settings saved successfully! 💕');
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      showToast('Error saving settings');
+    }
+  });
+
+  // Export JSON
+  dom.exportJsonBtn.addEventListener('click', () => {
+    const exportData = {
+      settings: currentSettings,
+      memories: currentMemories
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `our-love-story-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Memories exported as JSON! 📥');
+  });
+
+  // Copy JSON to clipboard
+  dom.copyJsonBtn.addEventListener('click', () => {
+    const exportData = {
+      settings: currentSettings,
+      memories: currentMemories
+    };
+    navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+      .then(() => showToast('JSON copied to clipboard! 📋'))
+      .catch(() => showToast('Failed to copy to clipboard'));
+  });
+
+  // Import JSON
+  dom.triggerImportBtn.addEventListener('click', () => dom.importJsonFileInput.click());
+  dom.importJsonFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        if (parsed.settings) {
+          currentSettings = parsed.settings;
+          await db.saveSetting('coupleSettings', currentSettings);
+        }
+        if (parsed.memories && Array.isArray(parsed.memories)) {
+          for (const mem of parsed.memories) {
+            await db.saveMemory(mem);
+          }
+          currentMemories = parsed.memories;
+        }
+        updateCoupleDisplays();
+        updateCountdownDOM();
+        renderTimeline();
+        renderAdminMemoriesList();
+        populateSettingsForm();
+        showToast('Memories successfully imported! 💕');
+      } catch (err) {
+        console.error(err);
+        showToast('Invalid JSON file format');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Reset to Defaults
+  dom.resetDefaultsBtn.addEventListener('click', async () => {
+    if (confirm('Are you sure you want to reset all memories and settings to default?')) {
+      await db.clearAll();
+      currentSettings = { ...DEFAULT_SETTINGS };
+      currentMemories = [...DEFAULT_MEMORIES];
+      for (const mem of DEFAULT_MEMORIES) {
+        await db.saveMemory(mem);
+      }
+      await db.saveSetting('coupleSettings', currentSettings);
+      updateCoupleDisplays();
+      updateCountdownDOM();
+      renderTimeline();
+      renderAdminMemoriesList();
+      populateSettingsForm();
+      closeAdminModal();
+      showToast('All memories reset to default 🌸');
+    }
+  });
+
+  // Heart Burst Button
+  dom.heartBurstBtn.addEventListener('click', (e) => {
+    const rect = dom.heartBurstBtn.getBoundingClientRect();
+    createHeartBurst(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  });
+
+  // Tap anywhere for sweet mini heart pop
+  document.body.addEventListener('click', (e) => {
+    // Only if not clicking a button/input
+    if (!e.target.closest('button, input, select, textarea, a, .modal')) {
+      createSingleHeart(e.clientX, e.clientY);
+    }
+  });
+
+  // Music Player Toggle
+  dom.musicToggleBtn.addEventListener('click', toggleMelody);
+}
+
+// =====================================================
+// CANVAS PARTICLES & HEARTS
+// =====================================================
+function setupCanvasParticles() {
+  const canvas = dom.heartCanvas;
+  const ctx = canvas.getContext('2d');
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  const particles = [];
+  const colors = ['#ff85a1', '#ffa5b9', '#ffccd5', '#f8a5c2', '#f5cd79'];
+
+  class FloatingParticle {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * width;
+      this.y = height + Math.random() * 50;
+      this.size = Math.random() * 12 + 8;
+      this.speedY = Math.random() * 0.7 + 0.3;
+      this.speedX = (Math.random() - 0.5) * 0.5;
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+      this.alpha = Math.random() * 0.4 + 0.2;
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotSpeed = (Math.random() - 0.5) * 0.02;
+    }
+    update() {
+      this.y -= this.speedY;
+      this.x += this.speedX;
+      this.rotation += this.rotSpeed;
+      if (this.y < -30) this.reset();
+    }
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      // Draw heart path
+      const s = this.size / 15;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-10 * s, -10 * s, -20 * s, 5 * s, 0, 20 * s);
+      ctx.bezierCurveTo(20 * s, 5 * s, 10 * s, -10 * s, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Create 18 gentle particles
+  for (let i = 0; i < 18; i++) {
+    const p = new FloatingParticle();
+    p.y = Math.random() * height; // initial spread
+    particles.push(p);
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, width, height);
+    particles.forEach(p => {
+      p.update();
+      p.draw();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+// Click Heart Pops
+function createSingleHeart(x, y) {
+  const el = document.createElement('div');
+  const icons = ['💕', '💖', '✨', '💗', '🌸'];
+  el.textContent = icons[Math.floor(Math.random() * icons.length)];
+  el.style.position = 'fixed';
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.fontSize = `${Math.random() * 12 + 18}px`;
+  el.style.pointerEvents = 'none';
+  el.style.zIndex = '9999';
+  el.style.transform = 'translate(-50%, -50%) scale(0.5)';
+  el.style.transition = 'all 0.8s cubic-bezier(0.1, 0.8, 0.3, 1)';
+  document.body.appendChild(el);
+
+  requestAnimationFrame(() => {
+    el.style.transform = `translate(${ (Math.random() - 0.5) * 40 }px, -70px) scale(1.3)`;
+    el.style.opacity = '0';
+  });
+
+  setTimeout(() => el.remove(), 850);
+}
+
+function createHeartBurst(x, y) {
+  for (let i = 0; i < 12; i++) {
+    setTimeout(() => {
+      createSingleHeart(x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 40);
+    }, i * 35);
+  }
+}
+
+// =====================================================
+// SOFT ROMANTIC WEB AUDIO LULLABY
+// =====================================================
+function toggleMelody() {
+  if (isPlayingMelody) {
+    stopMelody();
+  } else {
+    startMelody();
+  }
+}
+
+function startMelody() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) {
+      showToast('Audio not supported on this browser');
+      return;
+    }
+    if (!audioContext) {
+      audioContext = new AudioCtx();
+    }
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+
+    isPlayingMelody = true;
+    dom.musicToggleBtn.classList.add('playing');
+    showToast('Playing romantic melody 🎶');
+
+    // Sweet pentatonic music box notes (C major / A minor warm scale)
+    const notes = [
+      261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25
+    ];
+    const melodyPattern = [0, 2, 4, 2, 5, 4, 2, 0, 3, 5, 7, 5, 4, 2, 4, 0];
+    let noteIdx = 0;
+
+    melodyInterval = setInterval(() => {
+      if (!isPlayingMelody) return;
+      const freq = notes[melodyPattern[noteIdx % melodyPattern.length]];
+      playTone(freq, 0.45);
+      noteIdx++;
+    }, 450);
+  } catch (err) {
+    console.error('Audio error:', err);
+  }
+}
+
+function stopMelody() {
+  isPlayingMelody = false;
+  if (melodyInterval) clearInterval(melodyInterval);
+  dom.musicToggleBtn.classList.remove('playing');
+  showToast('Music paused 🎵');
+}
+
+function playTone(freq, duration = 0.5) {
+  if (!audioContext) return;
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+
+  gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+
+  osc.connect(gain);
+  gain.connect(audioContext.destination);
+
+  osc.start();
+  osc.stop(audioContext.currentTime + duration);
+}
+
+// =====================================================
+// UTILITIES
+// =====================================================
+function showToast(message) {
+  dom.toast.textContent = message;
+  dom.toast.classList.add('show');
+  setTimeout(() => dom.toast.classList.remove('show'), 2400);
+}
+
+function getCategoryIcon(cat) {
+  switch (cat) {
+    case 'Trip': return '✈️';
+    case 'Date': return '🍽️';
+    case 'First Date': return '💖';
+    case 'Milestone': return '🎉';
+    default: return '✨';
+  }
+}
+
+function formatCustomDate(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
