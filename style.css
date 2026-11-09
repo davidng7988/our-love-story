@@ -54,11 +54,15 @@ body {
   color: var(--text-dark);
   background: linear-gradient(180deg, #fff2f5 0%, #ffe9ee 50%, #fff0f3 100%);
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
   position: relative;
   overflow-x: hidden;
   line-height: 1.5;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 /* Floating Heart Canvas */
@@ -72,20 +76,23 @@ body {
   z-index: 1;
 }
 
-/* Mobile-First Frame Wrapper */
+/* Mobile-First Frame Wrapper (Always Centered) */
 .app-container {
   width: 100%;
   max-width: 480px;
   min-height: 100vh;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-left: 1px solid rgba(255, 214, 224, 0.4);
-  border-right: 1px solid rgba(255, 214, 224, 0.4);
-  box-shadow: 0 0 50px rgba(255, 160, 180, 0.18);
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(255, 214, 224, 0.45);
+  border-right: 1px solid rgba(255, 214, 224, 0.45);
+  box-shadow: 0 0 50px rgba(255, 160, 180, 0.2);
   position: relative;
   z-index: 2;
   padding-bottom: calc(70px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
 }
 
 /* Header */
@@ -93,11 +100,12 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+  width: 100%;
   padding-top: calc(10px + var(--safe-top));
   padding-bottom: 10px;
   padding-left: 18px;
   padding-right: 18px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(255, 214, 224, 0.5);
@@ -1500,4 +1508,17 @@ body {
 @keyframes zoomIn {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Mobile responsive seamless edge-to-edge on phones */
+@media (max-width: 480px) {
+  .app-container {
+    border-left: none;
+    border-right: none;
+    box-shadow: none;
+  }
+  .app-header {
+    border-left: none;
+    border-right: none;
+  }
 }
