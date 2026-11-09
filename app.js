@@ -120,12 +120,14 @@ const dom = {
 // =====================================================
 document.addEventListener('DOMContentLoaded', async () => {
   await loadData();
+  await initSavedAudio();
   setupCountdown();
   renderTimeline();
   setupCanvasParticles();
   setupEventListeners();
   renderAdminMemoriesList();
   populateSettingsForm();
+  setupAutoplay();
 });
 
 // Load settings and memories from IndexedDB
@@ -1026,7 +1028,8 @@ async function toggleMusic() {
   }
 }
 
-async function startMusic() {
+async function startMusic(isAuto = false) {
+  if (isPlayingMusic) return;
   isPlayingMusic = true;
   updateMusicUI(true);
 
@@ -1035,7 +1038,7 @@ async function startMusic() {
     dom.bgMusic.volume = musicVolume;
     try {
       await dom.bgMusic.play();
-      showToast('Playing Taylor Swift - Love Story 🎵');
+      if (!isAuto) showToast('Playing Taylor Swift - Love Story 🎵');
       return;
     } catch (err) {
       console.warn('Audio play failed, falling back to music box synth:', err);
@@ -1044,7 +1047,7 @@ async function startMusic() {
 
   // Fallback / Default: Sweet synthesized music box version of Love Story!
   startSynthChorus();
-  showToast('Playing Love Story - Music Box Edition 🎶');
+  if (!isAuto) showToast('Playing Love Story - Music Box Edition 🎶');
 }
 
 function stopMusic() {
@@ -1209,10 +1212,41 @@ async function initSavedAudio() {
   }
 }
 
-// Call on startup
-document.addEventListener('DOMContentLoaded', () => {
-  initSavedAudio();
-});
+// Autoplay setup with cross-browser and mobile gesture fallback
+function setupAutoplay() {
+  const tryAutoplay = async () => {
+    if (isPlayingMusic) return;
+    try {
+      await startMusic(true);
+      removeAutoplayListeners();
+    } catch (e) {
+      // Autoplay blocked by browser policy without gesture; waiting for first interaction
+    }
+  };
+
+  const onUserInteraction = async () => {
+    if (!isPlayingMusic) {
+      await startMusic(true);
+    }
+    removeAutoplayListeners();
+  };
+
+  function removeAutoplayListeners() {
+    window.removeEventListener('click', onUserInteraction);
+    window.removeEventListener('touchstart', onUserInteraction);
+    window.removeEventListener('scroll', onUserInteraction);
+    window.removeEventListener('keydown', onUserInteraction);
+  }
+
+  // Attempt immediate autoplay on load
+  tryAutoplay();
+
+  // Attach immediate fallback triggers on the very first touch/click/scroll
+  window.addEventListener('click', onUserInteraction, { once: true, passive: true });
+  window.addEventListener('touchstart', onUserInteraction, { once: true, passive: true });
+  window.addEventListener('scroll', onUserInteraction, { once: true, passive: true });
+  window.addEventListener('keydown', onUserInteraction, { once: true, passive: true });
+}
 
 // =====================================================
 // UTILITIES
