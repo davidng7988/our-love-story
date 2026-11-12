@@ -1,7 +1,7 @@
 // =====================================================
 // OUR LOVE STORY - APPLICATION LOGIC
 // =====================================================
-import { authService, firestoreDb, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js';
+import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js';
 
 let currentSettings = { ...DEFAULT_SETTINGS };
 let currentMemories = [...DEFAULT_MEMORIES];
@@ -947,12 +947,15 @@ function setupEventListeners() {
   dom.audioFileInput.addEventListener('change', handleCustomAudioUpload);
   dom.removeCustomAudioBtn.addEventListener('click', resetCustomAudio);
 
-  dom.saveAudioUrlBtn.addEventListener('click', () => {
+  dom.saveAudioUrlBtn.addEventListener('click', async () => {
     const url = dom.customAudioUrlInput.value.trim();
     if (url) {
       setAudioSource(url);
-      db.saveSetting('customAudioUrl', url);
-      showToast('Custom audio URL saved! 🎵');
+      await db.saveSetting('customAudioUrl', url);
+      await db.saveSetting('customAudioName', 'External Audio URL');
+      dom.removeCustomAudioBtn.classList.remove('hidden');
+      dom.musicModeStatus.innerHTML = `<span>🎵 Custom Audio Link synced to all devices</span>`;
+      showToast('Custom audio URL synced to all devices! 🎵');
     }
   });
 
@@ -1261,24 +1264,40 @@ function playBellTone(freq, duration = 0.5, volume = 0.08, type = 'sine') {
   osc.stop(now + duration + 0.05);
 }
 
-// Handle MP3 upload from device
+// Handle MP3 upload from device to Firebase Cloud Storage
 async function handleCustomAudioUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = async (evt) => {
-    const arrayBuffer = evt.target.result;
-    const blob = new Blob([arrayBuffer], { type: file.type || 'audio/mpeg' });
-    
-    // Save to IndexedDB
-    await db.saveMedia('custom_bg_audio', blob);
-    setAudioBlob(blob);
+  try {
+    dom.musicModeStatus.innerHTML = `<span>⏳ Uploading <strong>${escapeHtml(file.name)}</strong> to Firebase Cloud... (0%)</span>`;
+    showToast('Uploading song to Firebase Cloud... ☁️');
+
+    const result = await storageService.uploadMusic(file, (percent) => {
+      dom.musicModeStatus.innerHTML = `<span>⏳ Uploading <strong>${escapeHtml(file.name)}</strong>... ${Math.round(percent)}%</span>`;
+    });
+
+    const downloadUrl = result.downloadUrl;
+
+    // Save cloud URL and original filename to Firestore settings so ALL devices get it
+    await db.saveSetting('customAudioUrl', downloadUrl);
+    await db.saveSetting('customAudioName', file.name);
+
+    // Also update current device
+    setAudioSource(downloadUrl);
+    dom.customAudioUrlInput.value = downloadUrl;
     dom.removeCustomAudioBtn.classList.remove('hidden');
-    dom.musicModeStatus.innerHTML = `<span>🎵 Custom Audio: <strong>${escapeHtml(file.name)}</strong></span>`;
-    showToast('Taylor Swift MP3 saved successfully! 💕');
-  };
-  reader.readAsArrayBuffer(file);
+    dom.musicModeStatus.innerHTML = `<span>🎵 Cloud Music: <strong>${escapeHtml(file.name)}</strong> (Synced across all devices)</span>`;
+    showToast('Song uploaded & synced to all devices! 💕🎶');
+  } catch (err) {
+    console.error('Custom music upload error:', err);
+    let msg = err.message || 'Failed to upload audio to Firebase';
+    if (err.code === 'storage/unauthorized' || err.code === 'storage/unknown') {
+      msg = 'Firebase Storage needs to be initialized. Please visit Firebase Console > Storage to enable.';
+    }
+    showToast(`Upload error: ${msg}`);
+    dom.musicModeStatus.innerHTML = `<span class="danger-text">⚠️ ${escapeHtml(msg)}</span>`;
+  }
 }
 
 function setAudioBlob(blob) {
@@ -1294,35 +1313,62 @@ function setAudioSource(src) {
 }
 
 async function resetCustomAudio() {
-  await db.saveMedia('custom_bg_audio', null);
   await db.saveSetting('customAudioUrl', null);
+  await db.saveSetting('customAudioName', null);
+  resetCustomAudioLocally();
+  showToast('Reset to built-in Love Story music box 🎶');
+}
+
+function resetCustomAudioLocally() {
   if (customAudioBlobUrl) {
     URL.revokeObjectURL(customAudioBlobUrl);
     customAudioBlobUrl = null;
   }
   dom.bgMusic.src = 'assets/love-story.mp3';
-  dom.removeCustomAudioBtn.classList.add('hidden');
-  dom.musicModeStatus.innerHTML = `<span>✨ Built-in Love Story Chorus (Music Box Synth)</span>`;
-  showToast('Reset to built-in Love Story music box 🎶');
+  if (dom.customAudioUrlInput) dom.customAudioUrlInput.value = '';
+  if (dom.removeCustomAudioBtn) dom.removeCustomAudioBtn.classList.add('hidden');
+  if (dom.musicModeStatus) {
+    dom.musicModeStatus.innerHTML = `<span>✨ Built-in Love Story Chorus (Music Box Synth)</span>`;
+  }
 }
 
-// Load saved custom audio on startup
+// Load saved custom audio on startup & listen for real-time changes across devices
 async function initSavedAudio() {
   try {
-    const savedBlob = await db.getMedia('custom_bg_audio');
-    if (savedBlob && savedBlob.size > 0) {
-      setAudioBlob(savedBlob);
-      dom.removeCustomAudioBtn.classList.remove('hidden');
-      dom.musicModeStatus.innerHTML = `<span>🎵 Custom Audio Loaded</span>`;
-      return;
-    }
-
     const savedUrl = await db.getSetting('customAudioUrl');
+    const savedName = await db.getSetting('customAudioName');
+
     if (savedUrl) {
       setAudioSource(savedUrl);
-      dom.customAudioUrlInput.value = savedUrl;
-      dom.removeCustomAudioBtn.classList.remove('hidden');
-      dom.musicModeStatus.innerHTML = `<span>🎵 Audio URL: ${escapeHtml(savedUrl)}</span>`;
+      if (dom.customAudioUrlInput) dom.customAudioUrlInput.value = savedUrl;
+      if (dom.removeCustomAudioBtn) dom.removeCustomAudioBtn.classList.remove('hidden');
+      const displayName = savedName || 'Custom Cloud Track';
+      if (dom.musicModeStatus) {
+        dom.musicModeStatus.innerHTML = `<span>🎵 Cloud Music: <strong>${escapeHtml(displayName)}</strong> (Synced)</span>`;
+      }
+    } else {
+      dom.bgMusic.src = 'assets/love-story.mp3';
+    }
+
+    // Real-time synchronization across all devices
+    if (window.firestoreDb && window.firestoreDb.listenSetting) {
+      window.firestoreDb.listenSetting('customAudioUrl', async (newUrl) => {
+        if (newUrl && newUrl !== dom.bgMusic.src) {
+          const newName = await db.getSetting('customAudioName');
+          setAudioSource(newUrl);
+          if (dom.customAudioUrlInput) dom.customAudioUrlInput.value = newUrl;
+          if (dom.removeCustomAudioBtn) dom.removeCustomAudioBtn.classList.remove('hidden');
+          const displayName = newName || 'Custom Cloud Track';
+          if (dom.musicModeStatus) {
+            dom.musicModeStatus.innerHTML = `<span>🎵 Cloud Music: <strong>${escapeHtml(displayName)}</strong> (Synced)</span>`;
+          }
+          if (isPlayingMusic) {
+            await dom.bgMusic.play().catch(() => {});
+          }
+        } else if (!newUrl && dom.bgMusic.src && !dom.bgMusic.src.includes('love-story.mp3')) {
+          resetCustomAudioLocally();
+        }
+      });
     }
   } catch (err) {
     console.error('Audio init error:', err);

@@ -296,11 +296,11 @@
             </div>
 
             <div class="form-group">
-              <label>Upload MP3 Audio File (Taylor Swift - Love Story)</label>
-              <p class="form-hint">Upload an MP3 from your phone or laptop to play the studio audio directly on this device.</p>
-              <input type="file" id="audioFileInput" accept="audio/*" style="display: none;">
+              <label>Upload MP3 Audio File (Cloud Synced)</label>
+              <p class="form-hint">Upload an MP3 from your phone or laptop. It will be uploaded to Firebase and synced so all your devices hear the exact same song automatically.</p>
+              <input type="file" id="audioFileInput" accept="audio/*,.mp3" style="display: none;">
               <button type="button" class="btn secondary-btn full-btn" id="triggerAudioUploadBtn">
-                <span>📁</span> Select MP3 File from Device
+                <span>📁</span> Select MP3 File to Sync to Cloud
               </button>
               <button type="button" class="btn danger-btn small-btn hidden" id="removeCustomAudioBtn" style="margin-top: 8px;">
                 Reset to Built-in Music Box Melody
@@ -311,9 +311,10 @@
 
             <div class="form-group">
               <label>Or enter custom Audio Link (MP3 URL)</label>
+              <p class="form-hint">Enter any direct MP3 link to sync it across all devices.</p>
               <input type="url" id="customAudioUrlInput" class="form-control" placeholder="https://example.com/love-story.mp3">
               <button type="button" class="btn outline-btn small-btn" id="saveAudioUrlBtn" style="margin-top: 8px;">
-                Save Audio URL
+                Save & Sync Audio URL
               </button>
             </div>
 

@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAllowedUser() {
+      return request.auth != null &&
+             request.auth.token.email != null &&
+             request.auth.token.email.lower() in [
+               'ngkahxian@gmail.com'
+             ];
+    }
+
+    // Default deny for all files
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Custom music audio files
+    match /music/{allPaths=**} {
+      // Audio playback from HTML <audio> requires read access
+      allow read: if true;
+      // Only authorized accounts can upload or replace the custom music
+      allow write: if isAllowedUser() &&
+        request.resource.size < 50 * 1024 * 1024; // Limit to 50MB
+    }
+  }
+}

@@ -17,8 +17,15 @@ import {
   getDocs, 
   setDoc, 
   deleteDoc, 
-  writeBatch 
+  writeBatch,
+  onSnapshot 
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import { 
+  getStorage, 
+  ref, 
+  uploadBytesResumable, 
+  getDownloadURL 
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-storage.js";
 
 // Firebase web app configuration for our-love-story-427
 export const firebaseConfig = {
@@ -34,6 +41,7 @@ export const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const firestore = getFirestore(app);
+export const storage = getStorage(app);
 
 // Whitelisted email addresses allowed to access this private space
 export const ALLOWED_EMAILS = [
@@ -138,6 +146,20 @@ export const firestoreDb = {
     return true;
   },
 
+  listenSetting(key, callback) {
+    const docRef = doc(firestore, "settings", key);
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        callback(data.value !== undefined ? data.value : data);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.warn(`Error listening to setting ${key}:`, error);
+    });
+  },
+
   async clearAll() {
     const mems = await this.getAllMemories();
     const batch = writeBatch(firestore);
@@ -150,8 +172,53 @@ export const firestoreDb = {
   }
 };
 
-// Expose globally so existing app logic can seamlessly access
+// Cloud Storage Service Wrapper for Custom Audio & Media
+export const storageService = {
+  async uploadMusic(file, onProgress) {
+    if (!file) throw new Error("No audio file selected.");
+    
+    // Create unique storage path for the music
+    const timestamp = Date.now();
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const musicRef = ref(storage, `music/${cleanFileName}`);
+
+    const metadata = {
+      contentType: file.type || 'audio/mpeg',
+      customMetadata: {
+        originalName: file.name,
+        uploadedAt: new Date().toISOString()
+      }
+    };
+
+    const uploadTask = uploadBytesResumable(musicRef, file, metadata);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (onProgress) onProgress(progress);
+        },
+        (error) => {
+          console.error("Storage upload error:", error);
+          reject(error);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({ downloadUrl, fileName: file.name });
+          } catch (urlErr) {
+            reject(urlErr);
+          }
+        }
+      );
+    });
+  }
+};
+
+// Expose globally so all app components can seamlessly access
 window.authService = authService;
 window.firestoreDb = firestoreDb;
+window.storageService = storageService;
 window.isAllowedEmail = isAllowedEmail;
 window.ALLOWED_EMAILS = ALLOWED_EMAILS;
