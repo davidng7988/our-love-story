@@ -233,7 +233,7 @@
         <button class="sheet-tab-btn active" data-tab="memoriesTab">📸 Memories & Photos</button>
         <button class="sheet-tab-btn" data-tab="settingsTab">💑 Couple Settings</button>
         <button class="sheet-tab-btn" data-tab="musicTab">🎵 Music & Song</button>
-        <button class="sheet-tab-btn" data-tab="backupTab">💾 Export / Backup</button>
+        <button class="sheet-tab-btn" data-tab="backupTab">☁️ Cloud & Auth</button>
       </div>
 
       <div class="sheet-body">
@@ -326,11 +326,34 @@
           </div>
         </div>
 
-        <!-- TAB 4: Backup & GitHub Sync -->
+        <!-- TAB 4: Firebase Cloud Sync & Access -->
         <div class="sheet-tab-content" id="backupTab">
           <div class="backup-box">
-            <h4>💾 Export & Sync</h4>
-            <p>Export your memories as JSON data to backup or embed permanently into your GitHub repository so all devices see uploaded photos.</p>
+            <h4>☁️ Firebase Cloud Backend</h4>
+            <p>Your love story memories and couple settings are saved directly to Google Cloud Firestore (Project: <code>our-love-story-427</code>).</p>
+            
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Authenticated Account</label>
+              <div class="user-pill" id="currentUserDisplay">
+                <span>👤</span> <span id="currentUserEmail">Checking...</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Access Security</label>
+              <div class="auth-badge-status">
+                <span>🔒</span> Whitelist Enforced (Only authorized emails)
+              </div>
+            </div>
+
+            <button type="button" class="btn outline-btn small-btn full-btn" id="logoutBtn" style="margin-top: 10px;">
+              <span>🚪</span> Sign Out of Our Love Story
+            </button>
+
+            <hr class="form-divider">
+
+            <h4>💾 Offline JSON Backup</h4>
+            <p>Download a local backup copy of your memories JSON:</p>
             <div class="backup-actions">
               <button class="btn secondary-btn" id="exportJsonBtn">Download Memories JSON</button>
               <button class="btn secondary-btn" id="copyJsonBtn">Copy JSON to Clipboard</button>
@@ -338,15 +361,15 @@
             
             <hr class="form-divider">
             
-            <h4>📥 Import Memories</h4>
-            <p>Restore memories from a JSON file:</p>
+            <h4>📥 Import Memories to Firebase</h4>
+            <p>Restore memories from a JSON file into Firebase:</p>
             <input type="file" id="importJsonFileInput" accept=".json" style="display: none;">
             <button class="btn outline-btn" id="triggerImportBtn">Choose JSON File to Import</button>
 
             <hr class="form-divider">
 
             <h4>🔄 Reset to Defaults</h4>
-            <p class="danger-text">Reset all memories and settings to the original default setup:</p>
+            <p class="danger-text">Reset all memories and settings in Firebase to default:</p>
             <button class="btn danger-btn" id="resetDefaultsBtn">Reset All Data</button>
           </div>
         </div>
@@ -428,12 +451,49 @@
     </div>
   </div>
 
+  <!-- Authentication Gate Modal (Restricted Access) -->
+  <div class="auth-gate-overlay" id="authGateModal">
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="auth-heart-icon">💖</span>
+        <h2>Our Love Story</h2>
+        <p class="auth-subtext">Private Space • Authorized Access Only</p>
+      </div>
+
+      <div class="auth-alert hidden" id="authAlertBox"></div>
+
+      <form id="authForm" class="auth-form">
+        <div class="form-group">
+          <label for="authEmailInput">Email Address</label>
+          <input type="email" id="authEmailInput" class="form-control" placeholder="ngkahxian@gmail.com" required autocomplete="email">
+          <span class="auth-hint">Only whitelisted Google emails are permitted entry.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="authPasswordInput">Password</label>
+          <input type="password" id="authPasswordInput" class="form-control" placeholder="••••••••" required autocomplete="current-password" minlength="6">
+        </div>
+
+        <button type="submit" class="btn primary-btn full-btn" id="authSubmitBtn">
+          <span id="authSubmitBtnText">Sign In 💕</span>
+        </button>
+
+        <div class="auth-toggle-row">
+          <button type="button" class="auth-text-btn" id="toggleAuthModeBtn">
+            First time? Create password for this email
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
   <!-- Scripts -->
+  <script type="module" src="firebase-config.js"></script>
   <script src="db.js"></script>
   <script src="default-data.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

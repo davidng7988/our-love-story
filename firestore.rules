@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model:
+// - /memories/{memoryId} : Memory object (id, title, category, date, description, image, order, etc.)
+// - /settings/{settingKey} : Setting object (value)
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Whitelist of allowed emails - strictly restricts access
+    function isAllowedUser() {
+      return request.auth != null && 
+             request.auth.token.email != null &&
+             request.auth.token.email.lower() in [
+               'ngkahxian@gmail.com'
+               // Add partner's email here when needed:
+               // 'partner@gmail.com'
+             ];
+    }
+
+    // Default deny for all collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Memories collection
+    match /memories/{memoryId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser() &&
+        request.resource.data.id is string &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 200;
+      allow delete: if isAllowedUser();
+    }
+
+    // Settings collection
+    match /settings/{settingKey} {
+      allow read, write: if isAllowedUser();
+    }
+  }
+}

@@ -1,6 +1,7 @@
 // =====================================================
 // OUR LOVE STORY - APPLICATION LOGIC
 // =====================================================
+import { authService, firestoreDb, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js';
 
 let currentSettings = { ...DEFAULT_SETTINGS };
 let currentMemories = [...DEFAULT_MEMORIES];
@@ -10,6 +11,7 @@ let isPlayingMusic = false;
 let synthTimeoutId = null;
 let customAudioBlobUrl = null;
 let musicVolume = 0.7;
+let isRegisterMode = false;
 
 // DOM Elements
 const dom = {
@@ -110,6 +112,18 @@ const dom = {
   triggerImportBtn: document.getElementById('triggerImportBtn'),
   resetDefaultsBtn: document.getElementById('resetDefaultsBtn'),
 
+  // Auth Elements
+  authGateModal: document.getElementById('authGateModal'),
+  authForm: document.getElementById('authForm'),
+  authEmailInput: document.getElementById('authEmailInput'),
+  authPasswordInput: document.getElementById('authPasswordInput'),
+  authSubmitBtn: document.getElementById('authSubmitBtn'),
+  authSubmitBtnText: document.getElementById('authSubmitBtnText'),
+  authAlertBox: document.getElementById('authAlertBox'),
+  toggleAuthModeBtn: document.getElementById('toggleAuthModeBtn'),
+  currentUserEmail: document.getElementById('currentUserEmail'),
+  logoutBtn: document.getElementById('logoutBtn'),
+
   // Toast
   toast: document.getElementById('toast'),
   heartCanvas: document.getElementById('heartCanvas')
@@ -119,18 +133,119 @@ const dom = {
 // INITIALIZATION
 // =====================================================
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadData();
+  setupAuthHandlers();
   await initSavedAudio();
   setupCountdown();
-  renderTimeline();
   setupCanvasParticles();
   setupEventListeners();
-  renderAdminMemoriesList();
-  populateSettingsForm();
   setupAutoplay();
 });
 
-// Load settings and memories from IndexedDB
+// =====================================================
+// AUTHENTICATION & ACCESS CONTROL
+// =====================================================
+function setupAuthHandlers() {
+  if (!dom.authForm) return;
+
+  // Toggle between Sign In and First-time Registration
+  if (dom.toggleAuthModeBtn) {
+    dom.toggleAuthModeBtn.addEventListener('click', () => {
+      isRegisterMode = !isRegisterMode;
+      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Register Account 💕' : 'Sign In 💕';
+      dom.toggleAuthModeBtn.textContent = isRegisterMode
+        ? 'Already have an account? Sign In here'
+        : 'First time? Create password for this email';
+      if (dom.authAlertBox) {
+        dom.authAlertBox.classList.add('hidden');
+        dom.authAlertBox.textContent = '';
+      }
+    });
+  }
+
+  // Handle Sign In / Register Form Submission
+  dom.authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = dom.authEmailInput.value.trim();
+    const password = dom.authPasswordInput.value;
+
+    if (!isAllowedEmail(email)) {
+      showAuthError(`⛔ Access Denied: "${email}" is not authorized to access this private space. All other accounts are blocked.`);
+      return;
+    }
+
+    try {
+      dom.authSubmitBtn.disabled = true;
+      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Creating Account...' : 'Signing In...';
+      if (dom.authAlertBox) dom.authAlertBox.classList.add('hidden');
+
+      if (isRegisterMode) {
+        await authService.register(email, password);
+        showToast('Account registered successfully! Welcome 💕');
+      } else {
+        await authService.login(email, password);
+        showToast('Welcome back to Our Love Story 💕');
+      }
+    } catch (err) {
+      console.error('Auth error:', err);
+      let msg = err.message || 'Authentication failed';
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Incorrect password. If this is your first time, click "First time? Create password" below.';
+      } else if (err.code === 'auth/user-not-found') {
+        msg = 'No existing password found for this email. Click "First time? Create password" below to set it up.';
+      } else if (err.code === 'auth/email-already-in-use') {
+        msg = 'An account already exists for this email. Please switch to Sign In.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password should be at least 6 characters.';
+      }
+      showAuthError(msg);
+    } finally {
+      dom.authSubmitBtn.disabled = false;
+      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Register Account 💕' : 'Sign In 💕';
+    }
+  });
+
+  // Logout Button
+  if (dom.logoutBtn) {
+    dom.logoutBtn.addEventListener('click', async () => {
+      try {
+        await authService.logout();
+        closeAdminModal();
+        showToast('Signed out of Our Love Story 🌸');
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+    });
+  }
+
+  // Real-time Authentication State Listener
+  authService.onStateChanged(async (user, err) => {
+    if (user && isAllowedEmail(user.email)) {
+      // Authorized user is active
+      if (dom.authGateModal) dom.authGateModal.classList.add('hidden');
+      if (dom.currentUserEmail) dom.currentUserEmail.textContent = user.email;
+      await loadData();
+      renderTimeline();
+      renderAdminMemoriesList();
+      populateSettingsForm();
+    } else {
+      // Not authenticated or blocked
+      if (dom.authGateModal) dom.authGateModal.classList.remove('hidden');
+      if (dom.currentUserEmail) dom.currentUserEmail.textContent = 'Not signed in';
+      if (err) {
+        showAuthError(err.message);
+      }
+    }
+  });
+}
+
+function showAuthError(message) {
+  if (!dom.authAlertBox) return;
+  dom.authAlertBox.className = 'auth-alert error';
+  dom.authAlertBox.textContent = message;
+  dom.authAlertBox.classList.remove('hidden');
+}
+
+// Load settings and memories from Firestore / DB
 async function loadData() {
   try {
     const savedSettings = await db.getSetting('coupleSettings');
@@ -142,10 +257,11 @@ async function loadData() {
     if (savedMemories && savedMemories.length > 0) {
       currentMemories = savedMemories.sort((a, b) => (a.order || 0) - (b.order || 0));
     } else {
-      // Seed default memories into IndexedDB
+      // Seed default memories into Firestore / DB
       for (const mem of DEFAULT_MEMORIES) {
         await db.saveMemory(mem);
       }
+      await db.saveSetting('coupleSettings', currentSettings);
       currentMemories = [...DEFAULT_MEMORIES];
     }
   } catch (err) {
@@ -155,6 +271,7 @@ async function loadData() {
   }
 
   updateCoupleDisplays();
+  updateCountdownDOM();
 }
 
 // Update couple titles & names across the UI
@@ -554,9 +671,9 @@ function handleImageFile(file) {
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
-      // Compress with max dimension 1400px
+      // Compress with max dimension 1000px for optimal Firebase Cloud sync
       const canvas = document.createElement('canvas');
-      const maxDim = 1400;
+      const maxDim = 1000;
       let width = img.width;
       let height = img.height;
 
@@ -575,9 +692,9 @@ function handleImageFile(file) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      currentUploadedImageBase64 = canvas.toDataURL('image/jpeg', 0.86);
+      currentUploadedImageBase64 = canvas.toDataURL('image/jpeg', 0.78);
       showImagePreview(currentUploadedImageBase64);
-      showToast('Photo uploaded & optimized! 📸');
+      showToast('Photo uploaded & optimized for Cloud! 📸');
     };
     img.src = e.target.result;
   };
