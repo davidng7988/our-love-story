@@ -1,7 +1,20 @@
 // =====================================================
 // OUR LOVE STORY - APPLICATION LOGIC
 // =====================================================
-import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js';
+import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js?v=5';
+
+const LOCAL_WHITELIST = [
+  'ngkahxian@gmail.com',
+  'wanyung050211@gmail.com'
+];
+
+function isUserAllowed(email) {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  if (LOCAL_WHITELIST.includes(clean)) return true;
+  if (typeof isAllowedEmail === 'function' && isAllowedEmail(clean)) return true;
+  return false;
+}
 
 let currentSettings = { ...DEFAULT_SETTINGS };
 let currentMemories = [...DEFAULT_MEMORIES];
@@ -230,7 +243,7 @@ function setupAuthHandlers() {
     const email = dom.authEmailInput.value.trim();
     const password = dom.authPasswordInput.value;
 
-    if (!isAllowedEmail(email)) {
+    if (!isUserAllowed(email)) {
       showAuthError(`⛔ Access Denied: "${email}" is not authorized to access this private space. All other accounts are blocked.`);
       return;
     }
@@ -274,7 +287,7 @@ function setupAuthHandlers() {
 
   // Real-time Authentication State Listener
   authService.onStateChanged(async (user, err) => {
-    if (user && isAllowedEmail(user.email)) {
+    if (user && isUserAllowed(user.email)) {
       // Authorized user is active
       if (dom.authGateModal) dom.authGateModal.classList.add('hidden');
       if (dom.currentUserEmail) dom.currentUserEmail.textContent = user.email;
