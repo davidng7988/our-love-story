@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Our Love Story 💕 - Forever & Always</title>
-  <meta name="description" content="A warm, lovely countdown of our days together and our cherished memories.">
+  <meta name="description" content="A warm, lovely countdown of our days together, our cherished memories, and our daily markdown calendar.">
   <meta name="theme-color" content="#ffe8ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <!-- Floating background particles -->
@@ -36,6 +36,9 @@
           <span class="logo-text">Our Story</span>
         </div>
         <div class="header-actions">
+          <button id="openDailyHeaderBtn" class="header-submodule-btn" title="Daily Markdown Calendar" aria-label="Daily Markdown Calendar">
+            <span>🗓️ Daily Log</span>
+          </button>
           <button id="musicToggleBtn" class="icon-btn" title="Taylor Swift - Love Story" aria-label="Toggle Music">
             <span class="music-note">🎵</span>
           </button>
@@ -146,19 +149,138 @@
           <span class="quote-mark end-quote">”</span>
         </div>
 
-        <a href="#memoriesSection" class="scroll-down-btn" id="scrollDownBtn">
-          <span>Explore Our Memories</span>
+        <a href="#dailyMarkdownSection" class="scroll-down-btn" id="scrollDownBtn">
+          <span>Explore Our Daily Log & Memories</span>
           <span class="down-arrow">↓</span>
         </a>
       </div>
     </section>
 
-    <!-- Memories Timeline Section -->
+    <!-- Submodule Navigation Switcher -->
+    <div class="submodule-nav-container">
+      <div class="submodule-tabs" role="tablist">
+        <button class="submodule-tab active" id="tabDailyMarkdown" role="tab" aria-selected="true" data-target="dailyMarkdownSection">
+          <span class="tab-emoji">🗓️</span>
+          <span class="tab-label">Daily Markdown</span>
+          <span class="tab-count-badge" id="dailyMarkdownBadge">0</span>
+        </button>
+        <button class="submodule-tab" id="tabMemories" role="tab" aria-selected="false" data-target="memoriesSection">
+          <span class="tab-emoji">📸</span>
+          <span class="tab-label">Memories</span>
+          <span class="tab-count-badge" id="memoriesBadge">5</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================= -->
+    <!-- SUBMODULE 1: DAILY MARKDOWN (CALENDAR & LOGS)     -->
+    <!-- ================================================= -->
+    <section class="daily-markdown-section" id="dailyMarkdownSection">
+      <div class="section-header">
+        <span class="section-tag">Our Daily Footprints 🗓️</span>
+        <h2 class="section-title">Daily Markdown</h2>
+        <p class="section-desc">Click any date to mark down what happened—record our sport games, dinner dates, sweet notes, and upload photos for both of us to view! 💕</p>
+        
+        <!-- Summary stats pills -->
+        <div class="daily-stats-bar" id="dailyStatsBar">
+          <div class="stat-pill"><span class="stat-icon">🗓️</span><strong id="statDaysCount">0</strong> Days Marked</div>
+          <div class="stat-pill"><span class="stat-icon">🏸</span><strong id="statSportsCount">0</strong> Sports Done</div>
+          <div class="stat-pill"><span class="stat-icon">📸</span><strong id="statPhotosCount">0</strong> Photos Saved</div>
+        </div>
+
+        <!-- Controls: Filters & View Mode -->
+        <div class="calendar-controls-row">
+          <div class="daily-filter-tabs" id="dailyFilterTabs">
+            <button class="filter-btn active" data-daily-filter="all">All Logs</button>
+            <button class="filter-btn" data-daily-filter="Sport">🏸 Sport</button>
+            <button class="filter-btn" data-daily-filter="Date">🍽️ Date</button>
+            <button class="filter-btn" data-daily-filter="Photo">📸 With Photo</button>
+          </div>
+
+          <div class="view-mode-toggle">
+            <button class="view-toggle-btn active" id="viewCalendarBtn" title="Calendar View" aria-label="Calendar View">
+              <span>🗓️ Calendar</span>
+            </button>
+            <button class="view-toggle-btn" id="viewListBtn" title="List View" aria-label="List View">
+              <span>📋 List</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CALENDAR VIEW WRAPPER -->
+      <div class="calendar-wrapper" id="calendarWrapper">
+        <div class="calendar-card">
+          <!-- Calendar Month Navigation -->
+          <div class="calendar-header">
+            <button class="cal-nav-btn" id="calPrevMonthBtn" title="Previous Month" aria-label="Previous Month">❮</button>
+            <div class="cal-month-display">
+              <span class="cal-month-name" id="calMonthYearText">November 2026</span>
+            </div>
+            <button class="cal-nav-btn" id="calNextMonthBtn" title="Next Month" aria-label="Next Month">❯</button>
+            <button class="cal-today-btn" id="calTodayBtn">Today</button>
+          </div>
+
+          <!-- Weekday Headers -->
+          <div class="calendar-weekdays">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+
+          <!-- Calendar Days Grid -->
+          <div class="calendar-grid" id="calendarDaysGrid">
+            <!-- Dynamically populated day cells -->
+          </div>
+        </div>
+
+        <!-- Selected Date Details Card -->
+        <div class="selected-day-card" id="selectedDayCard">
+          <div class="selected-day-header">
+            <div class="selected-day-title-wrap">
+              <span class="selected-day-icon">🗓️</span>
+              <div>
+                <h3 class="selected-day-date" id="selectedDateHeading">Thursday, Nov 12, 2026</h3>
+                <span class="selected-day-rel" id="selectedDateRel">Today</span>
+              </div>
+            </div>
+            <button class="btn primary-btn small-btn" id="openAddDailyBtn">
+              <span>➕</span> Mark Down
+            </button>
+          </div>
+
+          <div class="selected-day-entries" id="selectedDayEntries">
+            <!-- Entries for the selected day will render here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST / ALL ENTRIES VIEW WRAPPER (Shown when toggled to List) -->
+      <div class="daily-list-wrapper hidden" id="dailyListWrapper">
+        <div class="daily-list-header">
+          <span class="daily-list-title">All Marked Days 💕</span>
+          <button class="btn primary-btn small-btn" id="openAddDailyListBtn">
+            <span>➕</span> Mark Down New Day
+          </button>
+        </div>
+        <div class="daily-all-entries-list" id="dailyAllEntriesList">
+          <!-- Dynamically rendered list of all daily entries -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= -->
+    <!-- SUBMODULE 2: MEMORIES TIMELINE SECTION            -->
+    <!-- ================================================= -->
     <section class="memories-section" id="memoriesSection">
       <div class="section-header">
         <span class="section-tag">Our Precious Journey 📸</span>
         <h2 class="section-title">Cherished Memories</h2>
-        <p class="section-desc">Every smile, every road trip, and every unforgettable moment we've shared.</p>
+        <p class="section-desc">Every smile, every road trip, and every unforgettable moment we've shared together.</p>
         
         <!-- Filter Tabs -->
         <div class="filter-tabs">
@@ -198,19 +320,137 @@
 
   <!-- ================= MODALS ================= -->
 
-  <!-- Lightbox Modal for Fullscreen Photo View -->
+  <!-- Lightbox Modal for Fullscreen Photo View (Works for Memories & Daily Markdown) -->
   <div class="modal" id="lightboxModal" aria-hidden="true">
     <div class="modal-backdrop" id="lightboxBackdrop"></div>
     <div class="lightbox-content">
       <button class="modal-close-btn" id="lightboxCloseBtn">&times;</button>
       <div class="lightbox-img-wrapper">
-        <img id="lightboxImg" src="" alt="Memory full view">
+        <img id="lightboxImg" src="" alt="Photo full view">
       </div>
       <div class="lightbox-details">
         <span class="badge" id="lightboxBadge">Date</span>
         <h3 id="lightboxTitle"></h3>
         <p class="lightbox-loc" id="lightboxLocation"></p>
         <p class="lightbox-desc" id="lightboxDesc"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Daily Markdown Modal -->
+  <div class="modal modal-sheet" id="dailyMarkdownModal" aria-hidden="true">
+    <div class="modal-backdrop" id="dailyMarkdownBackdrop"></div>
+    <div class="sheet-container">
+      <div class="sheet-handle"></div>
+      
+      <div class="sheet-header">
+        <div class="sheet-title-group">
+          <h2 id="dailyModalHeading">Mark Down This Day 📝💕</h2>
+          <p id="dailyModalSubheading">Record what happened, sport games, notes, and photos</p>
+        </div>
+        <button class="sheet-close-btn" id="dailyModalCloseBtn">&times;</button>
+      </div>
+
+      <div class="sheet-body">
+        <form id="dailyMarkdownForm" class="settings-form">
+          <input type="hidden" id="dailyEntryId">
+
+          <!-- Date Picker -->
+          <div class="form-group">
+            <label for="dailyEntryDate">Date *</label>
+            <input type="date" id="dailyEntryDate" class="form-control" required>
+          </div>
+
+          <!-- Category Quick Selection Chips -->
+          <div class="form-group">
+            <label>Category *</label>
+            <div class="category-chips-row" id="dailyCategoryChips">
+              <button type="button" class="category-chip active" data-category="Sport" data-icon="🏸">
+                <span>🏸</span> Sport & Fitness
+              </button>
+              <button type="button" class="category-chip" data-category="Date" data-icon="🍽️">
+                <span>🍽️</span> Date & Food
+              </button>
+              <button type="button" class="category-chip" data-category="Chill" data-icon="🎬">
+                <span>🎬</span> Movie & Chill
+              </button>
+              <button type="button" class="category-chip" data-category="Trip" data-icon="✈️">
+                <span>✈️</span> Trip & Outing
+              </button>
+              <button type="button" class="category-chip" data-category="Romantic" data-icon="💖">
+                <span>💖</span> Sweet Moment
+              </button>
+              <button type="button" class="category-chip" data-category="Journal" data-icon="📝">
+                <span>📝</span> Daily Note
+              </button>
+            </div>
+            <input type="hidden" id="dailyCategoryInput" value="Sport">
+            <input type="hidden" id="dailyCategoryIconInput" value="🏸">
+          </div>
+
+          <!-- Activity / Sport Name -->
+          <div class="form-group">
+            <label for="dailyActivityInput" id="dailyActivityLabel">What Sport / Activity did we do? *</label>
+            <input type="text" id="dailyActivityInput" class="form-control" placeholder="e.g. Badminton, Gym (Leg Day), Jogging, Swimming..." required>
+            
+            <!-- Quick Suggestion Chips for Sports & Activities -->
+            <div class="quick-suggest-row" id="dailySuggestRow">
+              <span class="suggest-hint">Quick pick:</span>
+              <button type="button" class="suggest-chip" data-suggest="Badminton" data-icon="🏸">🏸 Badminton</button>
+              <button type="button" class="suggest-chip" data-suggest="Gym Workout" data-icon="🏋️">🏋️ Gym</button>
+              <button type="button" class="suggest-chip" data-suggest="Jogging" data-icon="🏃">🏃 Jogging</button>
+              <button type="button" class="suggest-chip" data-suggest="Swimming" data-icon="🏊">🏊 Swimming</button>
+              <button type="button" class="suggest-chip" data-suggest="Cycling" data-icon="🚴">🚴 Cycling</button>
+              <button type="button" class="suggest-chip" data-suggest="Tennis" data-icon="🎾">🎾 Tennis</button>
+            </div>
+          </div>
+
+          <!-- Markdown Story / Notes with Formatting Tools -->
+          <div class="form-group">
+            <div class="label-with-tools">
+              <label for="dailyContentInput">Mark Down What Happened (Markdown supported) ✍️</label>
+              <div class="markdown-tools">
+                <button type="button" class="md-tool-btn" data-tool="bold" title="Bold text"><b>B</b></button>
+                <button type="button" class="md-tool-btn" data-tool="italic" title="Italic text"><i>I</i></button>
+                <button type="button" class="md-tool-btn" data-tool="list" title="Bullet list">• List</button>
+                <button type="button" class="md-tool-btn" data-tool="quote" title="Quote">“ Quote</button>
+                <button type="button" class="md-tool-btn" data-tool="heart" title="Insert heart">💕</button>
+              </div>
+            </div>
+            <textarea id="dailyContentInput" class="form-control" rows="4" placeholder="Write down what happened today! E.g.
+Played 3 sets of badminton! Score: 21-19, 18-21, 21-17.
+Super fun rallies and sweating it out together! 💪"></textarea>
+            <small class="form-hint">Tip: Supports **bold**, *italic*, - bullet lists, and > quotes.</small>
+          </div>
+
+          <!-- Optional Photo Upload with Compression -->
+          <div class="form-group">
+            <label>Optional Photo 📸 (Both can view!)</label>
+            <div class="image-upload-dropzone" id="dailyDropzone">
+              <img id="dailyImagePreview" class="image-preview hidden" src="" alt="Daily photo preview">
+              <div class="dropzone-placeholder" id="dailyDropzonePlaceholder">
+                <span class="camera-icon">📷</span>
+                <span class="upload-title">Tap to attach a photo of today</span>
+                <span class="upload-sub">Optional: Upload from phone camera or gallery (JPG, PNG, WEBP)</span>
+              </div>
+              <input type="file" id="dailyImageFileInput" accept="image/*" class="file-input-hidden">
+            </div>
+            <div class="image-preview-actions hidden" id="dailyPreviewActions">
+              <button type="button" class="btn outline-btn small-btn" id="changeDailyPhotoBtn">Change Photo</button>
+              <button type="button" class="btn danger-btn small-btn" id="removeDailyPhotoBtn">Remove Photo</button>
+            </div>
+          </div>
+
+          <!-- Logged By -->
+          <div class="form-group">
+            <label for="dailyLoggedByInput">Logged By</label>
+            <input type="text" id="dailyLoggedByInput" class="form-control" placeholder="e.g. David, My Love, or Both of Us">
+          </div>
+
+          <div class="form-btn-row">
+            <button type="submit" class="btn primary-btn full-btn" id="saveDailySubmitBtn">Save Daily Markdown 💕</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -224,13 +464,14 @@
       <div class="sheet-header">
         <div class="sheet-title-group">
           <h2>⚙️ Admin & Photo Console</h2>
-          <p>Customize names, anniversary date & upload photos directly</p>
+          <p>Customize names, anniversary date, daily logs & upload photos</p>
         </div>
         <button class="sheet-close-btn" id="adminCloseBtn">&times;</button>
       </div>
 
       <div class="sheet-tabs">
-        <button class="sheet-tab-btn active" data-tab="memoriesTab">📸 Memories & Photos</button>
+        <button class="sheet-tab-btn active" data-tab="memoriesTab">📸 Memories</button>
+        <button class="sheet-tab-btn" data-tab="dailyAdminTab">🗓️ Daily Logs</button>
         <button class="sheet-tab-btn" data-tab="settingsTab">💑 Couple Settings</button>
         <button class="sheet-tab-btn" data-tab="musicTab">🎵 Music & Song</button>
         <button class="sheet-tab-btn" data-tab="backupTab">☁️ Cloud & Auth</button>
@@ -252,7 +493,21 @@
           </div>
         </div>
 
-        <!-- TAB 2: Couple Settings -->
+        <!-- TAB 2: Daily Markdowns in Admin -->
+        <div class="sheet-tab-content" id="dailyAdminTab">
+          <div class="admin-action-row">
+            <span class="admin-section-label">Manage Daily Markdowns</span>
+            <button class="btn primary-btn small-btn" id="adminAddDailyBtn">
+              <span>➕</span> Mark Down Day
+            </button>
+          </div>
+
+          <div class="admin-memories-list" id="adminDailyList">
+            <!-- Dynamically populated list of daily markdowns -->
+          </div>
+        </div>
+
+        <!-- TAB 3: Couple Settings -->
         <div class="sheet-tab-content" id="settingsTab">
           <form id="settingsForm" class="settings-form">
             <div class="form-group">
@@ -282,7 +537,7 @@
           </form>
         </div>
 
-        <!-- TAB 3: Music Settings -->
+        <!-- TAB 4: Music Settings -->
         <div class="sheet-tab-content" id="musicTab">
           <div class="backup-box">
             <h4>🎵 Background Music: Taylor Swift - Love Story</h4>
@@ -327,11 +582,11 @@
           </div>
         </div>
 
-        <!-- TAB 4: Firebase Cloud Sync & Access -->
+        <!-- TAB 5: Firebase Cloud Sync & Access -->
         <div class="sheet-tab-content" id="backupTab">
           <div class="backup-box">
             <h4>☁️ Firebase Cloud Backend</h4>
-            <p>Your love story memories and couple settings are saved directly to Google Cloud Firestore (Project: <code>our-love-story-427</code>).</p>
+            <p>Your love story memories, daily markdowns, and couple settings are saved directly to Google Cloud Firestore (Project: <code>our-love-story-427</code>).</p>
             
             <div class="form-group" style="margin-top: 14px;">
               <label>Authenticated Account</label>
@@ -354,10 +609,11 @@
             <hr class="form-divider">
 
             <h4>💾 Offline JSON Backup</h4>
-            <p>Download a local backup copy of your memories JSON:</p>
+            <p>Download a local backup copy of your memories & daily markdowns JSON:</p>
             <div class="backup-actions">
               <button class="btn secondary-btn" id="exportJsonBtn">Download Memories JSON</button>
-              <button class="btn secondary-btn" id="copyJsonBtn">Copy JSON to Clipboard</button>
+              <button class="btn secondary-btn" id="exportDailyJsonBtn">Download Daily Markdowns JSON</button>
+              <button class="btn secondary-btn" id="copyJsonBtn">Copy Memories JSON</button>
             </div>
             
             <hr class="form-divider">
@@ -492,9 +748,9 @@
   <div id="toast" class="toast"></div>
 
   <!-- Scripts -->
-  <script type="module" src="firebase-config.js?v=2"></script>
-  <script src="db.js?v=2"></script>
-  <script src="default-data.js?v=2"></script>
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="firebase-config.js?v=3"></script>
+  <script src="db.js?v=3"></script>
+  <script src="default-data.js?v=3"></script>
+  <script type="module" src="app.js?v=3"></script>
 </body>
 </html>

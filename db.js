@@ -1,14 +1,15 @@
 // =====================================================
 // OUR LOVE STORY - DATABASE ADAPTER (FIRESTORE + INDEXEDDB)
 // =====================================================
-// Firestore is used for all memories & settings (synced across devices)
-// IndexedDB is retained for local media/audio caching
+// Firestore is used for all memories, daily markdown & settings (synced across devices)
+// IndexedDB is retained for local media/audio caching & offline fallback
 
 const DB_NAME = 'OurLoveStoryDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'memories';
 const SETTINGS_STORE = 'settings';
 const MEDIA_STORE = 'media';
+const DAILY_MARKDOWN_STORE = 'daily_markdown';
 
 class LoveStoryDB {
   constructor() {
@@ -31,6 +32,9 @@ class LoveStoryDB {
         }
         if (!db.objectStoreNames.contains(MEDIA_STORE)) {
           db.createObjectStore(MEDIA_STORE, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(DAILY_MARKDOWN_STORE)) {
+          db.createObjectStore(DAILY_MARKDOWN_STORE, { keyPath: 'id' });
         }
       };
 
@@ -142,6 +146,78 @@ class LoveStoryDB {
     });
   }
 
+  // --- Daily Markdown (Firestore Backend + IndexedDB Cache) ---
+  async getAllDailyMarkdown() {
+    if (window.firestoreDb) {
+      try {
+        const firestoreList = await window.firestoreDb.getAllDailyMarkdown();
+        if (firestoreList && firestoreList.length > 0) {
+          // Sync into local IndexedDB cache
+          await this.init();
+          const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readwrite');
+          const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+          firestoreList.forEach(item => store.put(item));
+          return firestoreList;
+        }
+      } catch (err) {
+        console.warn('Firestore getAllDailyMarkdown error, falling back to local cache:', err);
+      }
+    }
+
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readonly');
+      const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const list = request.result || [];
+        resolve(list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0)));
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async saveDailyMarkdown(entry) {
+    if (window.firestoreDb) {
+      try {
+        await window.firestoreDb.saveDailyMarkdown(entry);
+      } catch (err) {
+        console.warn('Firestore saveDailyMarkdown error:', err);
+      }
+    }
+
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readwrite');
+      const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+      const request = store.put(entry);
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteDailyMarkdown(id) {
+    if (window.firestoreDb) {
+      try {
+        await window.firestoreDb.deleteDailyMarkdown(id);
+      } catch (err) {
+        console.warn('Firestore deleteDailyMarkdown error:', err);
+      }
+    }
+
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readwrite');
+      const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+      const request = store.delete(id);
+
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   // --- Settings (Firestore Backend) ---
   async getSetting(key, defaultValue = null) {
     if (window.firestoreDb) {
@@ -170,7 +246,6 @@ class LoveStoryDB {
   }
 
   async saveSetting(key, value) {
-    // 1. Save to Firestore
     if (window.firestoreDb) {
       try {
         await window.firestoreDb.saveSetting(key, value);
@@ -179,7 +254,6 @@ class LoveStoryDB {
       }
     }
 
-    // 2. Save locally in IndexedDB
     await this.init();
     return new Promise((resolve, reject) => {
       const tx = this.indexedDb.transaction([SETTINGS_STORE], 'readwrite');
@@ -202,9 +276,10 @@ class LoveStoryDB {
 
     await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.indexedDb.transaction([STORE_NAME, SETTINGS_STORE], 'readwrite');
+      const tx = this.indexedDb.transaction([STORE_NAME, SETTINGS_STORE, DAILY_MARKDOWN_STORE], 'readwrite');
       tx.objectStore(STORE_NAME).clear();
       tx.objectStore(SETTINGS_STORE).clear();
+      tx.objectStore(DAILY_MARKDOWN_STORE).clear();
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });

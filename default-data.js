@@ -93,3 +93,40 @@ const DEFAULT_MEMORIES = [
     pinned: true
   }
 ];
+
+// Sample default Daily Markdown entries for calendar starter
+const DEFAULT_DAILY_MARKDOWNS = [
+  {
+    id: "daily-1",
+    date: "2026-11-12",
+    category: "Sport",
+    categoryIcon: "🏸",
+    activity: "Badminton Doubles",
+    content: "We played 3 intense sets of badminton doubles tonight! 🏸\n- **Match 1**: 21 - 18\n- **Match 2**: 19 - 21\n- **Match 3**: 21 - 17\nSuper fun rally rallies and drenched in sweat together! 💪",
+    image: "",
+    loggedBy: "David & My Love",
+    createdAt: Date.now()
+  },
+  {
+    id: "daily-2",
+    date: "2026-11-10",
+    category: "Date",
+    categoryIcon: "🍜",
+    activity: "Dinner & Post-Workout Dessert",
+    content: "Rewarded our active day with delicious beef noodles and matcha shaved ice 🍨. Talked for hours about our upcoming travel plans!",
+    image: "",
+    loggedBy: "David",
+    createdAt: Date.now() - 172800000
+  },
+  {
+    id: "daily-3",
+    date: "2026-11-08",
+    category: "Sport",
+    categoryIcon: "🏃",
+    activity: "Sunset Jog at Lake Park",
+    content: "Ran a lovely 4.5km around the lakeside as the sky turned golden pink 🌅. Cooled down walking hand-in-hand.",
+    image: "",
+    loggedBy: "My Love",
+    createdAt: Date.now() - 345600000
+  }
+];

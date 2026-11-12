@@ -3,6 +3,7 @@ rules_version = '2';
 // ===============================================================
 // Assumed Data Model:
 // - /memories/{memoryId} : Memory object (id, title, category, date, description, image, order, etc.)
+// - /daily_markdown/{entryId} : Daily Markdown entry (id, date, category, activity, content, image, etc.)
 // - /settings/{settingKey} : Setting object (value)
 // ===============================================================
 
@@ -33,6 +34,11 @@ service cloud.firestore {
         request.resource.data.title is string &&
         request.resource.data.title.size() <= 200;
       allow delete: if isAllowedUser();
+    }
+
+    // Daily Markdown collection (calendar logs, sports, notes & photos)
+    match /daily_markdown/{entryId} {
+      allow read, write: if isAllowedUser();
     }
 
     // Settings collection

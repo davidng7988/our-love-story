@@ -125,6 +125,81 @@ export const firestoreDb = {
     return true;
   },
 
+  // Daily Markdown methods
+  async getAllDailyMarkdown() {
+    try {
+      const colRef = collection(firestore, "daily_markdown");
+      const snapshot = await getDocs(colRef);
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data());
+      });
+      return list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    } catch (err) {
+      console.warn("Direct daily_markdown collection read failed, checking settings store fallback:", err);
+      const fallback = await this.getSetting("dailyMarkdownStore", []);
+      return Array.isArray(fallback) ? fallback : [];
+    }
+  },
+
+  async saveDailyMarkdown(entry) {
+    if (!entry || !entry.id) return;
+    try {
+      const docRef = doc(firestore, "daily_markdown", entry.id);
+      await setDoc(docRef, entry, { merge: true });
+      return entry;
+    } catch (err) {
+      console.warn("Direct daily_markdown collection save failed, using settings fallback:", err);
+      const existing = (await this.getSetting("dailyMarkdownStore", [])) || [];
+      const idx = existing.findIndex(e => e.id === entry.id);
+      if (idx >= 0) {
+        existing[idx] = entry;
+      } else {
+        existing.push(entry);
+      }
+      await this.saveSetting("dailyMarkdownStore", existing);
+      return entry;
+    }
+  },
+
+  async deleteDailyMarkdown(id) {
+    if (!id) return;
+    try {
+      const docRef = doc(firestore, "daily_markdown", id);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.warn("Direct daily_markdown delete failed, using settings fallback:", err);
+    }
+    try {
+      const existing = (await this.getSetting("dailyMarkdownStore", [])) || [];
+      const updated = existing.filter(e => e.id !== id);
+      if (updated.length !== existing.length) {
+        await this.saveSetting("dailyMarkdownStore", updated);
+      }
+    } catch (e) {
+      console.warn("Settings fallback delete error:", e);
+    }
+    return true;
+  },
+
+  listenDailyMarkdown(callback) {
+    try {
+      const colRef = collection(firestore, "daily_markdown");
+      return onSnapshot(colRef, (snapshot) => {
+        const list = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data());
+        });
+        callback(list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0)));
+      }, (err) => {
+        console.warn("Daily markdown snapshot notice (using fallback poll/fetch):", err);
+      });
+    } catch (err) {
+      console.warn("Error setting up daily markdown snapshot:", err);
+      return () => {};
+    }
+  },
+
   async getSetting(key, defaultValue = null) {
     try {
       const docRef = doc(firestore, "settings", key);
@@ -177,7 +252,6 @@ export const storageService = {
   async uploadMusic(file, onProgress) {
     if (!file) throw new Error("No audio file selected.");
     
-    // Create unique storage path for the music
     const timestamp = Date.now();
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const musicRef = ref(storage, `music/${cleanFileName}`);

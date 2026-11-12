@@ -6,6 +6,17 @@ import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAIL
 let currentSettings = { ...DEFAULT_SETTINGS };
 let currentMemories = [...DEFAULT_MEMORIES];
 let currentFilter = 'all';
+
+// Daily Markdown State
+let currentDailyMarkdowns = typeof DEFAULT_DAILY_MARKDOWNS !== 'undefined' ? [...DEFAULT_DAILY_MARKDOWNS] : [];
+let currentDailyFilter = 'all';
+let currentDailyView = 'calendar'; // 'calendar' | 'list'
+const todayInit = new Date();
+let selectedDateStr = `${todayInit.getFullYear()}-${String(todayInit.getMonth() + 1).padStart(2, '0')}-${String(todayInit.getDate()).padStart(2, '0')}`;
+let calCurrentYear = todayInit.getFullYear();
+let calCurrentMonth = todayInit.getMonth();
+let currentDailyImageBase64 = '';
+
 let audioContext = null;
 let isPlayingMusic = false;
 let synthTimeoutId = null;
@@ -126,7 +137,74 @@ const dom = {
 
   // Toast
   toast: document.getElementById('toast'),
-  heartCanvas: document.getElementById('heartCanvas')
+  heartCanvas: document.getElementById('heartCanvas'),
+
+  // Submodule Switcher & Header Button
+  openDailyHeaderBtn: document.getElementById('openDailyHeaderBtn'),
+  tabDailyMarkdown: document.getElementById('tabDailyMarkdown'),
+  tabMemories: document.getElementById('tabMemories'),
+  dailyMarkdownBadge: document.getElementById('dailyMarkdownBadge'),
+  memoriesBadge: document.getElementById('memoriesBadge'),
+  dailyMarkdownSection: document.getElementById('dailyMarkdownSection'),
+  memoriesSection: document.getElementById('memoriesSection'),
+
+  // Daily Markdown Section & Stats
+  dailyStatsBar: document.getElementById('dailyStatsBar'),
+  statDaysCount: document.getElementById('statDaysCount'),
+  statSportsCount: document.getElementById('statSportsCount'),
+  statPhotosCount: document.getElementById('statPhotosCount'),
+  dailyFilterTabs: document.getElementById('dailyFilterTabs'),
+  viewCalendarBtn: document.getElementById('viewCalendarBtn'),
+  viewListBtn: document.getElementById('viewListBtn'),
+  calendarWrapper: document.getElementById('calendarWrapper'),
+  dailyListWrapper: document.getElementById('dailyListWrapper'),
+
+  // Calendar Controls & Grid
+  calPrevMonthBtn: document.getElementById('calPrevMonthBtn'),
+  calNextMonthBtn: document.getElementById('calNextMonthBtn'),
+  calTodayBtn: document.getElementById('calTodayBtn'),
+  calMonthYearText: document.getElementById('calMonthYearText'),
+  calendarDaysGrid: document.getElementById('calendarDaysGrid'),
+
+  // Selected Day Panel
+  selectedDayCard: document.getElementById('selectedDayCard'),
+  selectedDateHeading: document.getElementById('selectedDateHeading'),
+  selectedDateRel: document.getElementById('selectedDateRel'),
+  openAddDailyBtn: document.getElementById('openAddDailyBtn'),
+  selectedDayEntries: document.getElementById('selectedDayEntries'),
+  dailyAllEntriesList: document.getElementById('dailyAllEntriesList'),
+  openAddDailyListBtn: document.getElementById('openAddDailyListBtn'),
+
+  // Daily Markdown Modal
+  dailyMarkdownModal: document.getElementById('dailyMarkdownModal'),
+  dailyMarkdownBackdrop: document.getElementById('dailyMarkdownBackdrop'),
+  dailyModalCloseBtn: document.getElementById('dailyModalCloseBtn'),
+  dailyModalHeading: document.getElementById('dailyModalHeading'),
+  dailyMarkdownForm: document.getElementById('dailyMarkdownForm'),
+  dailyEntryId: document.getElementById('dailyEntryId'),
+  dailyEntryDate: document.getElementById('dailyEntryDate'),
+  dailyCategoryChips: document.getElementById('dailyCategoryChips'),
+  dailyCategoryInput: document.getElementById('dailyCategoryInput'),
+  dailyCategoryIconInput: document.getElementById('dailyCategoryIconInput'),
+  dailyActivityInput: document.getElementById('dailyActivityInput'),
+  dailyActivityLabel: document.getElementById('dailyActivityLabel'),
+  dailySuggestRow: document.getElementById('dailySuggestRow'),
+  dailyContentInput: document.getElementById('dailyContentInput'),
+  dailyDropzone: document.getElementById('dailyDropzone'),
+  dailyDropzonePlaceholder: document.getElementById('dailyDropzonePlaceholder'),
+  dailyImageFileInput: document.getElementById('dailyImageFileInput'),
+  dailyImagePreview: document.getElementById('dailyImagePreview'),
+  dailyPreviewActions: document.getElementById('dailyPreviewActions'),
+  changeDailyPhotoBtn: document.getElementById('changeDailyPhotoBtn'),
+  removeDailyPhotoBtn: document.getElementById('removeDailyPhotoBtn'),
+  dailyLoggedByInput: document.getElementById('dailyLoggedByInput'),
+  saveDailySubmitBtn: document.getElementById('saveDailySubmitBtn'),
+
+  // Admin Daily Logs Tab
+  adminDailyTab: document.getElementById('dailyAdminTab'),
+  adminDailyList: document.getElementById('adminDailyList'),
+  adminAddDailyBtn: document.getElementById('adminAddDailyBtn'),
+  exportDailyJsonBtn: document.getElementById('exportDailyJsonBtn')
 };
 
 // =====================================================
@@ -227,6 +305,20 @@ function setupAuthHandlers() {
       renderTimeline();
       renderAdminMemoriesList();
       populateSettingsForm();
+
+      // Listen for real-time Daily Markdown sync
+      if (window.firestoreDb && window.firestoreDb.listenDailyMarkdown) {
+        window.firestoreDb.listenDailyMarkdown((updatedList) => {
+          if (updatedList && Array.isArray(updatedList) && updatedList.length > 0) {
+            currentDailyMarkdowns = updatedList;
+            renderCalendar();
+            renderSelectedDateEntries();
+            renderDailyListView();
+            renderDailyStats();
+            renderAdminDailyList();
+          }
+        });
+      }
     } else {
       // Not authenticated or blocked
       if (dom.authGateModal) dom.authGateModal.classList.remove('hidden');
@@ -270,8 +362,31 @@ async function loadData() {
     currentMemories = [...DEFAULT_MEMORIES];
   }
 
+  // Load Daily Markdowns from DB
+  try {
+    const savedDaily = await db.getAllDailyMarkdown();
+    if (savedDaily && savedDaily.length > 0) {
+      currentDailyMarkdowns = savedDaily;
+    } else if (typeof DEFAULT_DAILY_MARKDOWNS !== 'undefined' && DEFAULT_DAILY_MARKDOWNS.length > 0) {
+      for (const d of DEFAULT_DAILY_MARKDOWNS) {
+        await db.saveDailyMarkdown(d);
+      }
+      currentDailyMarkdowns = [...DEFAULT_DAILY_MARKDOWNS];
+    }
+  } catch (dErr) {
+    console.warn('Error loading daily markdowns:', dErr);
+    if (typeof DEFAULT_DAILY_MARKDOWNS !== 'undefined') {
+      currentDailyMarkdowns = [...DEFAULT_DAILY_MARKDOWNS];
+    }
+  }
+
   updateCoupleDisplays();
   updateCountdownDOM();
+  renderCalendar();
+  renderSelectedDateEntries();
+  renderDailyListView();
+  renderDailyStats();
+  renderAdminDailyList();
 }
 
 // Update couple titles & names across the UI
@@ -535,6 +650,7 @@ function closeLightbox() {
 // =====================================================
 function openAdminModal() {
   renderAdminMemoriesList();
+  renderAdminDailyList();
   populateSettingsForm();
   dom.adminModal.classList.add('active');
   dom.adminModal.setAttribute('aria-hidden', 'false');
@@ -716,6 +832,613 @@ async function deleteMemoryById(id) {
 }
 
 // =====================================================
+// SUBMODULE: DAILY MARKDOWN ENGINE
+// Calendar, Activity Logger, Markdown Renderer & Photos
+// =====================================================
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function formatCalendarDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  const d = new Date(year, month, day);
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function getRelativeDateLabel(dateStr) {
+  if (!dateStr) return '';
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (dateStr === todayStr) return 'Today 💕';
+
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return '';
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const target = new Date(y, m, d);
+  const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffDays = Math.round((todayZero - target) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays === -1) return 'Tomorrow';
+  if (diffDays > 1) return `${diffDays} days ago`;
+  if (diffDays < -1) return `In ${Math.abs(diffDays)} days`;
+  return '';
+}
+
+function parseMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+
+  // Headers: ###, ##, #
+  html = html.replace(/^### (.*$)/gim, '<h5 style="margin:4px 0;font-size:0.92rem;color:var(--text-dark);font-weight:700;">$1</h5>');
+  html = html.replace(/^## (.*$)/gim, '<h4 style="margin:6px 0;font-size:1.02rem;color:var(--text-dark);font-weight:700;">$1</h4>');
+  html = html.replace(/^# (.*$)/gim, '<h3 style="margin:8px 0;font-size:1.1rem;color:var(--text-dark);font-weight:700;">$1</h3>');
+
+  // Bold: **text** or __text__
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+  // Italic: *text* or _text_
+  html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  html = html.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+  // Blockquotes: > quote
+  html = html.replace(/^>\s*(.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Bullet items: - or *
+  html = html.replace(/(?:^|\n)[-*]\s+(.+)/g, (match, item) => {
+    return `\n<ul><li>${item}</li></ul>`;
+  });
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+  // Line breaks
+  html = html.replace(/\n{2,}/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+
+  return `<p>${html}</p>`;
+}
+
+function insertMarkdownTool(tool) {
+  const textarea = dom.dailyContentInput;
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  let replacement = '';
+
+  switch (tool) {
+    case 'bold':
+      replacement = selectedText ? `**${selectedText}**` : `**bold text**`;
+      break;
+    case 'italic':
+      replacement = selectedText ? `*${selectedText}*` : `*italic text*`;
+      break;
+    case 'list':
+      replacement = selectedText ? `\n- ${selectedText}` : `\n- Match 1: 21-19\n- Match 2: 18-21`;
+      break;
+    case 'quote':
+      replacement = selectedText ? `\n> ${selectedText}` : `\n> Sweet memory or note`;
+      break;
+    case 'heart':
+      replacement = ` 💕 `;
+      break;
+    default:
+      return;
+  }
+
+  textarea.setRangeText(replacement, start, end, 'end');
+  textarea.focus();
+}
+
+function renderCalendar() {
+  if (!dom.calendarDaysGrid || !dom.calMonthYearText) return;
+  dom.calMonthYearText.textContent = `${MONTH_NAMES[calCurrentMonth]} ${calCurrentYear}`;
+
+  const firstDayOfMonth = new Date(calCurrentYear, calCurrentMonth, 1).getDay(); // 0 is Sunday
+  const daysInMonth = new Date(calCurrentYear, calCurrentMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(calCurrentYear, calCurrentMonth, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  let html = '';
+
+  // Previous month trailing padding days
+  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    const prevMonth = calCurrentMonth === 0 ? 11 : calCurrentMonth - 1;
+    const prevYear = calCurrentMonth === 0 ? calCurrentYear - 1 : calCurrentYear;
+    const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    html += `<div class="cal-day-cell other-month" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+    </div>`;
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${calCurrentYear}-${String(calCurrentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedDateStr;
+
+    // Filter markdowns for this day
+    const dayEntries = currentDailyMarkdowns.filter(e => e.date === dateStr);
+
+    let matchesFilter = true;
+    if (currentDailyFilter === 'Sport') {
+      matchesFilter = dayEntries.some(e => (e.category || '').toLowerCase() === 'sport');
+    } else if (currentDailyFilter === 'Date') {
+      matchesFilter = dayEntries.some(e => (e.category || '').toLowerCase() === 'date');
+    } else if (currentDailyFilter === 'Photo') {
+      matchesFilter = dayEntries.some(e => Boolean(e.image));
+    }
+
+    const hasEntries = dayEntries.length > 0;
+    const hasPhoto = dayEntries.some(e => Boolean(e.image));
+
+    let indicatorsHtml = '';
+    if (hasEntries && (currentDailyFilter === 'all' || matchesFilter)) {
+      indicatorsHtml += '<div class="cal-day-indicators">';
+      const icons = dayEntries.map(e => e.categoryIcon || (e.category === 'Sport' ? '🏸' : '💖')).slice(0, 2);
+      icons.forEach(ic => {
+        indicatorsHtml += `<span class="cal-mini-icon">${ic}</span>`;
+      });
+
+      if (dayEntries.length > 2) {
+        indicatorsHtml += `<span class="cal-multi-badge">+${dayEntries.length - 2}</span>`;
+      }
+
+      if (hasPhoto) {
+        indicatorsHtml += `<span class="cal-photo-dot" title="Photo attached"></span>`;
+      }
+      indicatorsHtml += '</div>';
+    }
+
+    const cellClasses = [
+      'cal-day-cell',
+      isToday ? 'today' : '',
+      isSelected ? 'selected' : '',
+      hasEntries ? 'has-entry' : ''
+    ].filter(Boolean).join(' ');
+
+    html += `<div class="${cellClasses}" data-date="${dateStr}">
+      <span class="cal-day-num">${day}</span>
+      ${indicatorsHtml}
+    </div>`;
+  }
+
+  // Next month leading padding days
+  const totalCellsSoFar = firstDayOfMonth + daysInMonth;
+  const nextDays = (7 - (totalCellsSoFar % 7)) % 7;
+  for (let d = 1; d <= nextDays; d++) {
+    const nextMonth = calCurrentMonth === 11 ? 0 : calCurrentMonth + 1;
+    const nextYear = calCurrentMonth === 11 ? calCurrentYear + 1 : calCurrentYear;
+    const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    html += `<div class="cal-day-cell other-month" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+    </div>`;
+  }
+
+  dom.calendarDaysGrid.innerHTML = html;
+}
+
+function renderSelectedDateEntries() {
+  if (!dom.selectedDateHeading) return;
+
+  dom.selectedDateHeading.textContent = formatCalendarDate(selectedDateStr);
+  const relLabel = getRelativeDateLabel(selectedDateStr);
+  dom.selectedDateRel.textContent = relLabel;
+  dom.selectedDateRel.style.display = relLabel ? 'inline-block' : 'none';
+
+  const dayEntries = currentDailyMarkdowns.filter(e => e.date === selectedDateStr);
+
+  if (dayEntries.length === 0) {
+    dom.selectedDayEntries.innerHTML = `
+      <div class="daily-empty-state">
+        <span class="daily-empty-icon">🏸🌸</span>
+        <h4>No activities marked down for this day</h4>
+        <p>Did you play badminton, go on a date, or share a sweet moment? Tap below to mark it down!</p>
+        <button class="btn primary-btn small-btn" id="emptyStateAddDailyBtn">
+          <span>➕</span> Mark Down This Day 💕
+        </button>
+      </div>
+    `;
+    const emptyBtn = document.getElementById('emptyStateAddDailyBtn');
+    if (emptyBtn) {
+      emptyBtn.addEventListener('click', () => openDailyMarkdownModal(null, selectedDateStr));
+    }
+    return;
+  }
+
+  dom.selectedDayEntries.innerHTML = dayEntries.map(entry => renderDailyEntryCard(entry)).join('');
+  attachDailyEntryCardListeners(dom.selectedDayEntries);
+}
+
+function renderDailyEntryCard(entry) {
+  const cat = entry.category || 'Sport';
+  const icon = entry.categoryIcon || (cat === 'Sport' ? '🏸' : '💖');
+  const catClass = (cat || '').toLowerCase().replace(/[^a-z]/g, '');
+  const hasPhoto = entry.image && entry.image.trim() !== '';
+
+  return `
+    <div class="daily-entry-card" data-id="${entry.id}">
+      <div class="daily-entry-header">
+        <div class="daily-badge-group">
+          <span class="daily-cat-badge ${catClass}">
+            <span>${icon}</span>
+            <span>${escapeHtml(cat)}</span>
+          </span>
+          ${entry.loggedBy ? `<span class="daily-logged-by">✍️ ${escapeHtml(entry.loggedBy)}</span>` : ''}
+        </div>
+        <div class="daily-entry-actions">
+          <button class="daily-action-btn edit" data-action="edit" data-id="${entry.id}" title="Edit this log">
+            <span>✏️</span> Edit
+          </button>
+          <button class="daily-action-btn delete" data-action="delete" data-id="${entry.id}" title="Delete this log">
+            <span>🗑️</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="daily-activity-title">
+        <span>${escapeHtml(entry.activity || 'Activity')}</span>
+      </div>
+
+      ${entry.content ? `<div class="daily-markdown-content">${parseMarkdown(entry.content)}</div>` : ''}
+
+      ${hasPhoto ? `
+        <div class="daily-photo-card" data-action="zoom" data-id="${entry.id}">
+          <img class="daily-photo-img" src="${entry.image}" alt="${escapeHtml(entry.activity || 'Photo')}" loading="lazy">
+          <div class="daily-photo-zoom-hint">
+            <span>🔍</span>
+            <span>Tap to view photo in fullscreen</span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function attachDailyEntryCardListeners(container) {
+  if (!container) return;
+
+  // Zoom photo in lightbox
+  container.querySelectorAll('[data-action="zoom"]').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.getAttribute('data-id');
+      const entry = currentDailyMarkdowns.find(e => e.id === id);
+      if (entry && entry.image) {
+        openDailyLightbox(entry);
+      }
+    });
+  });
+
+  // Edit log
+  container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      const entry = currentDailyMarkdowns.find(e => e.id === id);
+      if (entry) {
+        openDailyMarkdownModal(entry);
+      }
+    });
+  });
+
+  // Delete log
+  container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (confirm('Are you sure you want to delete this daily markdown?')) {
+        await deleteDailyMarkdownEntry(id);
+      }
+    });
+  });
+}
+
+function openDailyLightbox(entry) {
+  dom.lightboxImg.src = entry.image;
+  dom.lightboxBadge.textContent = `${entry.categoryIcon || '📸'} ${entry.category || 'Daily Log'}`;
+  dom.lightboxTitle.textContent = entry.activity || 'Our Daily Moment 💕';
+  dom.lightboxLocation.textContent = `🗓️ ${formatCalendarDate(entry.date)}`;
+  dom.lightboxDesc.textContent = entry.content || '';
+  dom.lightboxModal.classList.add('active');
+  dom.lightboxModal.setAttribute('aria-hidden', 'false');
+}
+
+function renderDailyListView() {
+  if (!dom.dailyAllEntriesList) return;
+
+  let list = [...currentDailyMarkdowns];
+
+  if (currentDailyFilter === 'Sport') {
+    list = list.filter(e => (e.category || '').toLowerCase() === 'sport');
+  } else if (currentDailyFilter === 'Date') {
+    list = list.filter(e => (e.category || '').toLowerCase() === 'date');
+  } else if (currentDailyFilter === 'Photo') {
+    list = list.filter(e => Boolean(e.image));
+  }
+
+  list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+
+  if (list.length === 0) {
+    dom.dailyAllEntriesList.innerHTML = `
+      <div class="daily-empty-state">
+        <span class="daily-empty-icon">📝✨</span>
+        <h4>No markdowns match this filter</h4>
+        <p>Tap below to mark down a sport or activity for any day!</p>
+        <button class="btn primary-btn small-btn" id="listEmptyAddBtn">
+          <span>➕</span> Mark Down Day
+        </button>
+      </div>
+    `;
+    const btn = document.getElementById('listEmptyAddBtn');
+    if (btn) btn.addEventListener('click', () => openDailyMarkdownModal(null, selectedDateStr));
+    return;
+  }
+
+  dom.dailyAllEntriesList.innerHTML = list.map(entry => {
+    return `
+      <div class="daily-list-item-wrapper" style="margin-bottom: 14px;">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--primary-pink);margin-bottom:6px;padding-left:4px;">
+          🗓️ ${formatCalendarDate(entry.date)} ${getRelativeDateLabel(entry.date) ? `• ${getRelativeDateLabel(entry.date)}` : ''}
+        </div>
+        ${renderDailyEntryCard(entry)}
+      </div>
+    `;
+  }).join('');
+
+  attachDailyEntryCardListeners(dom.dailyAllEntriesList);
+}
+
+function renderDailyStats() {
+  const uniqueDays = new Set(currentDailyMarkdowns.map(e => e.date)).size;
+  const sportsCount = currentDailyMarkdowns.filter(e => (e.category || '').toLowerCase() === 'sport').length;
+  const photosCount = currentDailyMarkdowns.filter(e => Boolean(e.image)).length;
+
+  if (dom.statDaysCount) dom.statDaysCount.textContent = uniqueDays;
+  if (dom.statSportsCount) dom.statSportsCount.textContent = sportsCount;
+  if (dom.statPhotosCount) dom.statPhotosCount.textContent = photosCount;
+  if (dom.dailyMarkdownBadge) dom.dailyMarkdownBadge.textContent = currentDailyMarkdowns.length;
+}
+
+function renderAdminDailyList() {
+  if (!dom.adminDailyList) return;
+  dom.adminDailyList.innerHTML = '';
+
+  if (currentDailyMarkdowns.length === 0) {
+    dom.adminDailyList.innerHTML = `<p style="padding:16px;text-align:center;color:var(--text-muted);">No daily markdowns yet.</p>`;
+    return;
+  }
+
+  currentDailyMarkdowns.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'admin-item-card';
+
+    const thumb = entry.image
+      ? `<img src="${entry.image}" alt="${escapeHtml(entry.activity)}">`
+      : `<span>${entry.categoryIcon || '🗓️'}</span>`;
+
+    card.innerHTML = `
+      <div class="admin-item-thumb">${thumb}</div>
+      <div class="admin-item-info">
+        <h4 class="admin-item-title">${escapeHtml(entry.activity || 'Activity')}</h4>
+        <span class="admin-item-date">${escapeHtml(entry.date)} • ${escapeHtml(entry.category || 'Log')}</span>
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn secondary-btn small-btn admin-daily-edit-btn" data-id="${entry.id}">Edit</button>
+        <button class="btn danger-btn small-btn admin-daily-delete-btn" data-id="${entry.id}">Delete</button>
+      </div>
+    `;
+    dom.adminDailyList.appendChild(card);
+  });
+
+  dom.adminDailyList.querySelectorAll('.admin-daily-edit-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.getAttribute('data-id');
+      const item = currentDailyMarkdowns.find(e => e.id === id);
+      if (item) {
+        closeAdminModal();
+        openDailyMarkdownModal(item);
+      }
+    });
+  });
+
+  dom.adminDailyList.querySelectorAll('.admin-daily-delete-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-id');
+      if (confirm('Are you sure you want to delete this daily markdown?')) {
+        await deleteDailyMarkdownEntry(id);
+      }
+    });
+  });
+}
+
+function openDailyMarkdownModal(entry = null, defaultDate = null) {
+  if (entry) {
+    dom.dailyModalHeading.textContent = 'Edit Daily Markdown 📝💕';
+    dom.dailyEntryId.value = entry.id;
+    dom.dailyEntryDate.value = entry.date || selectedDateStr;
+    dom.dailyCategoryInput.value = entry.category || 'Sport';
+    dom.dailyCategoryIconInput.value = entry.categoryIcon || '🏸';
+    dom.dailyActivityInput.value = entry.activity || '';
+    dom.dailyContentInput.value = entry.content || '';
+    dom.dailyLoggedByInput.value = entry.loggedBy || '';
+
+    const chips = dom.dailyCategoryChips.querySelectorAll('.category-chip');
+    chips.forEach(c => {
+      c.classList.toggle('active', c.getAttribute('data-category') === (entry.category || 'Sport'));
+    });
+
+    if (entry.image) {
+      currentDailyImageBase64 = entry.image;
+      showDailyImagePreview(entry.image);
+    } else {
+      currentDailyImageBase64 = '';
+      resetDailyImagePreview();
+    }
+  } else {
+    dom.dailyModalHeading.textContent = 'Mark Down This Day 📝💕';
+    dom.dailyMarkdownForm.reset();
+    dom.dailyEntryId.value = '';
+
+    const chosenDate = defaultDate || selectedDateStr || new Date().toISOString().split('T')[0];
+    dom.dailyEntryDate.value = chosenDate;
+
+    dom.dailyCategoryInput.value = 'Sport';
+    dom.dailyCategoryIconInput.value = '🏸';
+    const chips = dom.dailyCategoryChips.querySelectorAll('.category-chip');
+    chips.forEach(c => {
+      c.classList.toggle('active', c.getAttribute('data-category') === 'Sport');
+    });
+
+    dom.dailyLoggedByInput.value = currentSettings.partnerOne || 'David';
+    currentDailyImageBase64 = '';
+    resetDailyImagePreview();
+  }
+
+  updateCategoryFormState(dom.dailyCategoryInput.value);
+
+  dom.dailyMarkdownModal.classList.add('active');
+  dom.dailyMarkdownModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeDailyMarkdownModal() {
+  dom.dailyMarkdownModal.classList.remove('active');
+  dom.dailyMarkdownModal.setAttribute('aria-hidden', 'true');
+}
+
+function updateCategoryFormState(cat) {
+  if (cat === 'Sport') {
+    dom.dailyActivityLabel.textContent = 'What Sport / Activity did we do? *';
+    dom.dailyActivityInput.placeholder = 'e.g. Badminton, Gym (Leg Day), Jogging, Swimming...';
+    if (dom.dailySuggestRow) dom.dailySuggestRow.style.display = 'flex';
+  } else {
+    dom.dailyActivityLabel.textContent = 'Activity / Event Title *';
+    dom.dailyActivityInput.placeholder = 'e.g. Dinner Date, Movie Night, Sunset Walk...';
+    if (dom.dailySuggestRow) dom.dailySuggestRow.style.display = 'none';
+  }
+}
+
+function showDailyImagePreview(src) {
+  dom.dailyImagePreview.src = src;
+  dom.dailyImagePreview.classList.remove('hidden');
+  dom.dailyDropzonePlaceholder.classList.add('hidden');
+  dom.dailyPreviewActions.classList.remove('hidden');
+}
+
+function resetDailyImagePreview() {
+  dom.dailyImagePreview.src = '';
+  dom.dailyImagePreview.classList.add('hidden');
+  dom.dailyDropzonePlaceholder.classList.remove('hidden');
+  dom.dailyPreviewActions.classList.add('hidden');
+  dom.dailyImageFileInput.value = '';
+}
+
+function handleDailyImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Please select a valid image file');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxDim = 1000;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      currentDailyImageBase64 = canvas.toDataURL('image/jpeg', 0.78);
+      showDailyImagePreview(currentDailyImageBase64);
+      showToast('Photo attached & optimized! 📸');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function deleteDailyMarkdownEntry(id) {
+  try {
+    await db.deleteDailyMarkdown(id);
+    currentDailyMarkdowns = currentDailyMarkdowns.filter(e => e.id !== id);
+    renderCalendar();
+    renderSelectedDateEntries();
+    renderDailyListView();
+    renderDailyStats();
+    renderAdminDailyList();
+    showToast('Daily markdown removed.');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to delete daily markdown');
+  }
+}
+
+function setDailyViewMode(mode) {
+  currentDailyView = mode;
+  if (mode === 'calendar') {
+    dom.viewCalendarBtn.classList.add('active');
+    dom.viewListBtn.classList.remove('active');
+    dom.calendarWrapper.classList.remove('hidden');
+    dom.dailyListWrapper.classList.add('hidden');
+  } else {
+    dom.viewCalendarBtn.classList.remove('active');
+    dom.viewListBtn.classList.add('active');
+    dom.calendarWrapper.classList.add('hidden');
+    dom.dailyListWrapper.classList.remove('hidden');
+    renderDailyListView();
+  }
+}
+
+function switchSubmoduleTab(targetId) {
+  const isDaily = targetId === 'dailyMarkdownSection';
+  if (dom.tabDailyMarkdown) {
+    dom.tabDailyMarkdown.classList.toggle('active', isDaily);
+    dom.tabDailyMarkdown.setAttribute('aria-selected', isDaily ? 'true' : 'false');
+  }
+  if (dom.tabMemories) {
+    dom.tabMemories.classList.toggle('active', !isDaily);
+    dom.tabMemories.setAttribute('aria-selected', !isDaily ? 'true' : 'false');
+  }
+
+  const targetElem = document.getElementById(targetId);
+  if (targetElem) {
+    targetElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// =====================================================
 // EVENT LISTENERS
 // =====================================================
 function setupEventListeners() {
@@ -844,85 +1567,347 @@ function setupEventListeners() {
   });
 
   // Export JSON
-  dom.exportJsonBtn.addEventListener('click', () => {
-    const exportData = {
-      settings: currentSettings,
-      memories: currentMemories
-    };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `our-love-story-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Memories exported as JSON! 📥');
-  });
+  if (dom.exportJsonBtn) {
+    dom.exportJsonBtn.addEventListener('click', () => {
+      const exportData = {
+        settings: currentSettings,
+        memories: currentMemories
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `our-love-story-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Memories exported as JSON! 📥');
+    });
+  }
 
   // Copy JSON to clipboard
-  dom.copyJsonBtn.addEventListener('click', () => {
-    const exportData = {
-      settings: currentSettings,
-      memories: currentMemories
-    };
-    navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
-      .then(() => showToast('JSON copied to clipboard! 📋'))
-      .catch(() => showToast('Failed to copy to clipboard'));
-  });
+  if (dom.copyJsonBtn) {
+    dom.copyJsonBtn.addEventListener('click', () => {
+      const exportData = {
+        settings: currentSettings,
+        memories: currentMemories
+      };
+      navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+        .then(() => showToast('JSON copied to clipboard! 📋'))
+        .catch(() => showToast('Failed to copy to clipboard'));
+    });
+  }
 
   // Import JSON
-  dom.triggerImportBtn.addEventListener('click', () => dom.importJsonFileInput.click());
-  dom.importJsonFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  if (dom.triggerImportBtn && dom.importJsonFileInput) {
+    dom.triggerImportBtn.addEventListener('click', () => dom.importJsonFileInput.click());
+    dom.importJsonFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const parsed = JSON.parse(event.target.result);
-        if (parsed.settings) {
-          currentSettings = parsed.settings;
-          await db.saveSetting('coupleSettings', currentSettings);
-        }
-        if (parsed.memories && Array.isArray(parsed.memories)) {
-          for (const mem of parsed.memories) {
-            await db.saveMemory(mem);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (parsed.settings) {
+            currentSettings = parsed.settings;
+            await db.saveSetting('coupleSettings', currentSettings);
           }
-          currentMemories = parsed.memories;
+          if (parsed.memories && Array.isArray(parsed.memories)) {
+            for (const mem of parsed.memories) {
+              await db.saveMemory(mem);
+            }
+            currentMemories = parsed.memories;
+          }
+          updateCoupleDisplays();
+          updateCountdownDOM();
+          renderTimeline();
+          renderAdminMemoriesList();
+          populateSettingsForm();
+          showToast('Memories successfully imported! 💕');
+        } catch (err) {
+          console.error(err);
+          showToast('Invalid JSON file format');
         }
-        updateCoupleDisplays();
-        updateCountdownDOM();
-        renderTimeline();
-        renderAdminMemoriesList();
-        populateSettingsForm();
-        showToast('Memories successfully imported! 💕');
-      } catch (err) {
-        console.error(err);
-        showToast('Invalid JSON file format');
-      }
-    };
-    reader.readAsText(file);
-  });
+      };
+      reader.readAsText(file);
+    });
+  }
 
   // Reset to Defaults
   dom.resetDefaultsBtn.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to reset all memories and settings to default?')) {
+    if (confirm('Are you sure you want to reset all memories, daily logs, and settings to default?')) {
       await db.clearAll();
       currentSettings = { ...DEFAULT_SETTINGS };
       currentMemories = [...DEFAULT_MEMORIES];
+      currentDailyMarkdowns = typeof DEFAULT_DAILY_MARKDOWNS !== 'undefined' ? [...DEFAULT_DAILY_MARKDOWNS] : [];
+
       for (const mem of DEFAULT_MEMORIES) {
         await db.saveMemory(mem);
       }
+      for (const dm of currentDailyMarkdowns) {
+        await db.saveDailyMarkdown(dm);
+      }
       await db.saveSetting('coupleSettings', currentSettings);
+
       updateCoupleDisplays();
       updateCountdownDOM();
       renderTimeline();
       renderAdminMemoriesList();
+      renderCalendar();
+      renderSelectedDateEntries();
+      renderDailyListView();
+      renderDailyStats();
+      renderAdminDailyList();
       populateSettingsForm();
       closeAdminModal();
-      showToast('All memories reset to default 🌸');
+      showToast('All memories & daily logs reset to default 🌸');
     }
   });
+
+  // --- SUBMODULE: DAILY MARKDOWN EVENT LISTENERS ---
+
+  // Submodule navigation tabs
+  if (dom.tabDailyMarkdown) {
+    dom.tabDailyMarkdown.addEventListener('click', () => switchSubmoduleTab('dailyMarkdownSection'));
+  }
+  if (dom.tabMemories) {
+    dom.tabMemories.addEventListener('click', () => switchSubmoduleTab('memoriesSection'));
+  }
+  if (dom.openDailyHeaderBtn) {
+    dom.openDailyHeaderBtn.addEventListener('click', () => switchSubmoduleTab('dailyMarkdownSection'));
+  }
+
+  // Calendar month navigation
+  if (dom.calPrevMonthBtn) {
+    dom.calPrevMonthBtn.addEventListener('click', () => {
+      calCurrentMonth--;
+      if (calCurrentMonth < 0) {
+        calCurrentMonth = 11;
+        calCurrentYear--;
+      }
+      renderCalendar();
+    });
+  }
+
+  if (dom.calNextMonthBtn) {
+    dom.calNextMonthBtn.addEventListener('click', () => {
+      calCurrentMonth++;
+      if (calCurrentMonth > 11) {
+        calCurrentMonth = 0;
+        calCurrentYear++;
+      }
+      renderCalendar();
+    });
+  }
+
+  if (dom.calTodayBtn) {
+    dom.calTodayBtn.addEventListener('click', () => {
+      const now = new Date();
+      calCurrentYear = now.getFullYear();
+      calCurrentMonth = now.getMonth();
+      selectedDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      renderCalendar();
+      renderSelectedDateEntries();
+      showToast('Centered on Today 💕');
+    });
+  }
+
+  // Calendar days grid click (delegated)
+  if (dom.calendarDaysGrid) {
+    dom.calendarDaysGrid.addEventListener('click', (e) => {
+      const cell = e.target.closest('.cal-day-cell');
+      if (!cell) return;
+      const dateStr = cell.getAttribute('data-date');
+      if (!dateStr) return;
+
+      selectedDateStr = dateStr;
+      const [y, m] = dateStr.split('-').map(Number);
+      if (y !== calCurrentYear || m - 1 !== calCurrentMonth) {
+        calCurrentYear = y;
+        calCurrentMonth = m - 1;
+      }
+
+      renderCalendar();
+      renderSelectedDateEntries();
+
+      // Smooth scroll to selected day card on mobile
+      if (window.innerWidth <= 600 && dom.selectedDayCard) {
+        dom.selectedDayCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  }
+
+  // Daily Markdown filter buttons
+  if (dom.dailyFilterTabs) {
+    dom.dailyFilterTabs.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dom.dailyFilterTabs.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentDailyFilter = btn.getAttribute('data-daily-filter') || 'all';
+        renderCalendar();
+        if (currentDailyView === 'list') {
+          renderDailyListView();
+        }
+      });
+    });
+  }
+
+  // View mode toggle (Calendar vs List)
+  if (dom.viewCalendarBtn) {
+    dom.viewCalendarBtn.addEventListener('click', () => setDailyViewMode('calendar'));
+  }
+  if (dom.viewListBtn) {
+    dom.viewListBtn.addEventListener('click', () => setDailyViewMode('list'));
+  }
+
+  // Daily Markdown Modal Triggers
+  if (dom.openAddDailyBtn) {
+    dom.openAddDailyBtn.addEventListener('click', () => openDailyMarkdownModal(null, selectedDateStr));
+  }
+  if (dom.openAddDailyListBtn) {
+    dom.openAddDailyListBtn.addEventListener('click', () => openDailyMarkdownModal(null, selectedDateStr));
+  }
+  if (dom.adminAddDailyBtn) {
+    dom.adminAddDailyBtn.addEventListener('click', () => {
+      closeAdminModal();
+      openDailyMarkdownModal(null, selectedDateStr);
+    });
+  }
+  if (dom.dailyModalCloseBtn) {
+    dom.dailyModalCloseBtn.addEventListener('click', closeDailyMarkdownModal);
+  }
+  if (dom.dailyMarkdownBackdrop) {
+    dom.dailyMarkdownBackdrop.addEventListener('click', closeDailyMarkdownModal);
+  }
+
+  // Category chips inside modal
+  if (dom.dailyCategoryChips) {
+    dom.dailyCategoryChips.querySelectorAll('.category-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        dom.dailyCategoryChips.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const cat = chip.getAttribute('data-category');
+        const icon = chip.getAttribute('data-icon') || '✨';
+        dom.dailyCategoryInput.value = cat;
+        dom.dailyCategoryIconInput.value = icon;
+        updateCategoryFormState(cat);
+      });
+    });
+  }
+
+  // Sport suggestion quick-picks
+  if (dom.dailySuggestRow) {
+    dom.dailySuggestRow.querySelectorAll('.suggest-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const text = chip.getAttribute('data-suggest');
+        if (text) {
+          dom.dailyActivityInput.value = text;
+          dom.dailyActivityInput.focus();
+        }
+      });
+    });
+  }
+
+  // Markdown helper toolbar
+  document.querySelectorAll('.md-tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      insertMarkdownTool(btn.getAttribute('data-tool'));
+    });
+  });
+
+  // Daily photo upload dropzone
+  if (dom.dailyDropzone) {
+    dom.dailyDropzone.addEventListener('click', () => dom.dailyImageFileInput.click());
+  }
+  if (dom.dailyImageFileInput) {
+    dom.dailyImageFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleDailyImageFile(e.target.files[0]);
+      }
+    });
+  }
+  if (dom.changeDailyPhotoBtn) {
+    dom.changeDailyPhotoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dom.dailyImageFileInput.click();
+    });
+  }
+  if (dom.removeDailyPhotoBtn) {
+    dom.removeDailyPhotoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentDailyImageBase64 = '';
+      resetDailyImagePreview();
+    });
+  }
+
+  // Daily Markdown form submit
+  if (dom.dailyMarkdownForm) {
+    dom.dailyMarkdownForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const id = dom.dailyEntryId.value || 'daily-' + Date.now();
+      const isNew = !dom.dailyEntryId.value;
+      const dateVal = dom.dailyEntryDate.value || selectedDateStr;
+
+      const existing = currentDailyMarkdowns.find(item => item.id === id) || {};
+
+      const newEntry = {
+        ...existing,
+        id,
+        date: dateVal,
+        category: dom.dailyCategoryInput.value || 'Sport',
+        categoryIcon: dom.dailyCategoryIconInput.value || '🏸',
+        activity: dom.dailyActivityInput.value.trim(),
+        content: dom.dailyContentInput.value.trim(),
+        image: currentDailyImageBase64 || existing.image || '',
+        loggedBy: dom.dailyLoggedByInput.value.trim() || currentSettings.partnerOne || 'David',
+        createdAt: existing.createdAt || Date.now()
+      };
+
+      try {
+        await db.saveDailyMarkdown(newEntry);
+
+        if (isNew) {
+          currentDailyMarkdowns.unshift(newEntry);
+        } else {
+          const idx = currentDailyMarkdowns.findIndex(item => item.id === id);
+          if (idx !== -1) currentDailyMarkdowns[idx] = newEntry;
+        }
+
+        selectedDateStr = dateVal;
+        const [y, m] = dateVal.split('-').map(Number);
+        if (y !== calCurrentYear || m - 1 !== calCurrentMonth) {
+          calCurrentYear = y;
+          calCurrentMonth = m - 1;
+        }
+
+        closeDailyMarkdownModal();
+        renderCalendar();
+        renderSelectedDateEntries();
+        renderDailyListView();
+        renderDailyStats();
+        renderAdminDailyList();
+        showToast(isNew ? 'Daily markdown saved! 💕' : 'Markdown updated! ✨');
+      } catch (err) {
+        console.error('Error saving daily markdown:', err);
+        showToast('Error saving daily markdown');
+      }
+    });
+  }
+
+  // Export Daily Markdowns JSON
+  if (dom.exportDailyJsonBtn) {
+    dom.exportDailyJsonBtn.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(currentDailyMarkdowns, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `our-love-story-daily-markdown-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Daily markdowns exported as JSON! 📥');
+    });
+  }
 
   // Heart Burst Button
   dom.heartBurstBtn.addEventListener('click', (e) => {

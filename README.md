@@ -17,6 +17,18 @@ A warm, cute, mobile-first website celebrating our journey together from our ver
 - **📱 Mobile-Native First Experience**:
   - Built specifically to look and feel like a modern, polished mobile app on your phone.
   - Touch-friendly Polaroid photo cards, rounded pill badges, safe area support, and responsive fluid layout.
+- **🗓️ Daily Markdown (Interactive Calendar & Activity Logger)**:
+  - Interactive monthly calendar with previous/next month navigation and "Today" quick-jump.
+  - Visual activity badges on days (e.g. 🏸 Sport, 🍽️ Dates, ✈️ Trips, 📸 Photos).
+  - Selected date viewer with relative date tag ("Today", "Yesterday", "3 days ago").
+  - Log daily activities:
+    - **Sport & Fitness**: Badminton 🏸, Gym 🏋️, Jogging 🏃, Swimming 🏊, Cycling 🚴, Tennis 🎾, etc.
+    - **Date & Food 🍽️**, **Movie & Chill 🎬**, **Trip & Outing ✈️**, **Sweet Moment 💖**, **Daily Journal 📝**.
+  - Built-in **Markdown notes editor** supporting `**bold**`, `*italic*`, `- bullet lists`, and `> quotes`.
+  - **Optional photo upload**: Attach sweet daily photos with client-side canvas compression for rapid sync.
+  - Fullscreen photo lightbox so both partners can view the photo in high resolution!
+  - Filter by Sport, Date, or Photos only, plus toggle between Calendar and Timeline List views.
+  - Multi-device real-time sync with Google Cloud Firestore backend.
 - **📸 Cherished Memories Timeline**:
   - Pre-populated with your special moments:
     1. **Our Very First Date 🍽️**: D'Fortune Western Restaurant in Manjalara
