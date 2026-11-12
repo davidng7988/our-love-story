@@ -22,7 +22,6 @@ let isPlayingMusic = false;
 let synthTimeoutId = null;
 let customAudioBlobUrl = null;
 let musicVolume = 0.7;
-let isRegisterMode = false;
 
 // DOM Elements
 const dom = {
@@ -225,22 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupAuthHandlers() {
   if (!dom.authForm) return;
 
-  // Toggle between Sign In and First-time Registration
-  if (dom.toggleAuthModeBtn) {
-    dom.toggleAuthModeBtn.addEventListener('click', () => {
-      isRegisterMode = !isRegisterMode;
-      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Register Account 💕' : 'Sign In 💕';
-      dom.toggleAuthModeBtn.textContent = isRegisterMode
-        ? 'Already have an account? Sign In here'
-        : 'First time? Create password for this email';
-      if (dom.authAlertBox) {
-        dom.authAlertBox.classList.add('hidden');
-        dom.authAlertBox.textContent = '';
-      }
-    });
-  }
-
-  // Handle Sign In / Register Form Submission
+  // Handle Log In Form Submission (Registration is blocked; login only)
   dom.authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = dom.authEmailInput.value.trim();
@@ -253,32 +237,25 @@ function setupAuthHandlers() {
 
     try {
       dom.authSubmitBtn.disabled = true;
-      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Creating Account...' : 'Signing In...';
+      dom.authSubmitBtnText.textContent = 'Logging In...';
       if (dom.authAlertBox) dom.authAlertBox.classList.add('hidden');
 
-      if (isRegisterMode) {
-        await authService.register(email, password);
-        showToast('Account registered successfully! Welcome 💕');
-      } else {
-        await authService.login(email, password);
-        showToast('Welcome back to Our Love Story 💕');
-      }
+      await authService.login(email, password);
+      showToast('Welcome back to Our Love Story 💕');
     } catch (err) {
       console.error('Auth error:', err);
       let msg = err.message || 'Authentication failed';
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Incorrect password. If this is your first time, click "First time? Create password" below.';
+        msg = 'Incorrect password. Please verify your credentials and try again.';
       } else if (err.code === 'auth/user-not-found') {
-        msg = 'No existing password found for this email. Click "First time? Create password" below to set it up.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        msg = 'An account already exists for this email. Please switch to Sign In.';
-      } else if (err.code === 'auth/weak-password') {
-        msg = 'Password should be at least 6 characters.';
+        msg = 'No authorized account found for this email. Registration is closed.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many failed login attempts. Please wait a moment and try again.';
       }
       showAuthError(msg);
     } finally {
       dom.authSubmitBtn.disabled = false;
-      dom.authSubmitBtnText.textContent = isRegisterMode ? 'Register Account 💕' : 'Sign In 💕';
+      dom.authSubmitBtnText.textContent = 'Log In 💕';
     }
   });
 

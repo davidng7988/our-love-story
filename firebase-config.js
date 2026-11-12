@@ -45,9 +45,8 @@ export const storage = getStorage(app);
 
 // Whitelisted email addresses allowed to access this private space
 export const ALLOWED_EMAILS = [
-  "ngkahxian@gmail.com"
-  // Add partner's email here if needed:
-  // "partner@gmail.com"
+  "ngkahxian@gmail.com",
+  "wanyung050211@gmail.com"
 ];
 
 export function isAllowedEmail(email) {
