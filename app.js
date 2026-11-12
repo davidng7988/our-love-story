@@ -1324,7 +1324,7 @@ function resetCustomAudioLocally() {
     URL.revokeObjectURL(customAudioBlobUrl);
     customAudioBlobUrl = null;
   }
-  dom.bgMusic.src = 'assets/love-story.mp3';
+  dom.bgMusic.src = 'assets/love-story.mp3?v=2';
   if (dom.customAudioUrlInput) dom.customAudioUrlInput.value = '';
   if (dom.removeCustomAudioBtn) dom.removeCustomAudioBtn.classList.add('hidden');
   if (dom.musicModeStatus) {
@@ -1347,7 +1347,7 @@ async function initSavedAudio() {
         dom.musicModeStatus.innerHTML = `<span>🎵 Cloud Music: <strong>${escapeHtml(displayName)}</strong> (Synced)</span>`;
       }
     } else {
-      dom.bgMusic.src = 'assets/love-story.mp3';
+      dom.bgMusic.src = 'assets/love-story.mp3?v=2';
     }
 
     // Real-time synchronization across all devices
