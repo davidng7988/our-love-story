@@ -1,7 +1,7 @@
 // =====================================================
 // OUR LOVE STORY - APPLICATION LOGIC
 // =====================================================
-import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js?v=5';
+import { authService, firestoreDb, storageService, isAllowedEmail, ALLOWED_EMAILS } from './firebase-config.js?v=6';
 
 const LOCAL_WHITELIST = [
   'ngkahxian@gmail.com',
@@ -299,8 +299,11 @@ function setupAuthHandlers() {
       // Listen for real-time Daily Markdown sync
       if (window.firestoreDb && window.firestoreDb.listenDailyMarkdown) {
         window.firestoreDb.listenDailyMarkdown((updatedList) => {
-          if (updatedList && Array.isArray(updatedList) && updatedList.length > 0) {
+          if (updatedList && Array.isArray(updatedList)) {
             currentDailyMarkdowns = updatedList;
+            if (window.db && window.db.syncDailyMarkdownCache) {
+              window.db.syncDailyMarkdownCache(updatedList);
+            }
             renderCalendar();
             renderSelectedDateEntries();
             renderDailyListView();
@@ -355,12 +358,14 @@ async function loadData() {
   // Load Daily Markdowns from DB
   try {
     const savedDaily = await db.getAllDailyMarkdown();
-    if (savedDaily && savedDaily.length > 0) {
+    const isDailySeeded = await db.getSetting('dailyMarkdownSeeded', false);
+    if (savedDaily && Array.isArray(savedDaily) && (savedDaily.length > 0 || isDailySeeded)) {
       currentDailyMarkdowns = savedDaily;
     } else if (typeof DEFAULT_DAILY_MARKDOWNS !== 'undefined' && DEFAULT_DAILY_MARKDOWNS.length > 0) {
       for (const d of DEFAULT_DAILY_MARKDOWNS) {
         await db.saveDailyMarkdown(d);
       }
+      await db.saveSetting('dailyMarkdownSeeded', true);
       currentDailyMarkdowns = [...DEFAULT_DAILY_MARKDOWNS];
     }
   } catch (dErr) {

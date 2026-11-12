@@ -151,11 +151,12 @@ class LoveStoryDB {
     if (window.firestoreDb) {
       try {
         const firestoreList = await window.firestoreDb.getAllDailyMarkdown();
-        if (firestoreList && firestoreList.length > 0) {
-          // Sync into local IndexedDB cache
+        if (Array.isArray(firestoreList)) {
+          // Sync into local IndexedDB cache: clear old items so deleted ones don't linger!
           await this.init();
           const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readwrite');
           const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+          store.clear();
           firestoreList.forEach(item => store.put(item));
           return firestoreList;
         }
@@ -216,6 +217,19 @@ class LoveStoryDB {
       request.onsuccess = () => resolve(true);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  async syncDailyMarkdownCache(list) {
+    if (!Array.isArray(list)) return;
+    try {
+      await this.init();
+      const tx = this.indexedDb.transaction([DAILY_MARKDOWN_STORE], 'readwrite');
+      const store = tx.objectStore(DAILY_MARKDOWN_STORE);
+      store.clear();
+      list.forEach(item => store.put(item));
+    } catch (err) {
+      console.warn('syncDailyMarkdownCache error:', err);
+    }
   }
 
   // --- Settings (Firestore Backend) ---
